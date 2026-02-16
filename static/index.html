@@ -716,13 +716,33 @@ function selectParcelOnMap(p, poly) {
   
   // Update concept plan link with parcel geometry
   const conceptLink = document.querySelector('a[href="/concept-plan"]');
-  if (conceptLink && p._geometry) {
+  if (conceptLink) {
     const acreage = p.GIS_ACRES || 5.0;
     const subdivName = p.SUBDIV || 'Selected Parcel';
-    const geomParam = encodeURIComponent(JSON.stringify(p._geometry));
-    const newUrl = `/concept-plan?acreage=${acreage}&subdivision=${encodeURIComponent(subdivName)}&geometry=${geomParam}`;
-    conceptLink.href = newUrl;
-    console.log('Updated concept plan link with real parcel geometry');
+    
+    if (p._geometry) {
+      // Use existing geometry
+      const geomParam = encodeURIComponent(JSON.stringify(p._geometry));
+      const newUrl = `/concept-plan?acreage=${acreage}&subdivision=${encodeURIComponent(subdivName)}&geometry=${geomParam}`;
+      conceptLink.href = newUrl;
+      console.log('Updated concept plan link with real parcel geometry:', p._geometry);
+    } else {
+      // Fallback - fetch geometry by PIN
+      console.log('No geometry in parcel data, fetching by PIN:', p.PIN);
+      fetch(`/api/parcels/${encodeURIComponent(p.PIN)}`)
+        .then(resp => resp.json())
+        .then(data => {
+          if (data._geometry) {
+            const geomParam = encodeURIComponent(JSON.stringify(data._geometry));
+            const newUrl = `/concept-plan?acreage=${acreage}&subdivision=${encodeURIComponent(subdivName)}&geometry=${geomParam}`;
+            conceptLink.href = newUrl;
+            console.log('Updated concept plan link with fetched geometry:', data._geometry);
+          } else {
+            console.log('No geometry found for PIN:', p.PIN);
+          }
+        })
+        .catch(err => console.log('Error fetching geometry:', err));
+    }
   }
 }
 
