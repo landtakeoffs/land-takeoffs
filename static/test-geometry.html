@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parcel Geometry Test</title>
+</head>
+<body>
+    <h2>Parcel Geometry Test</h2>
+    <canvas id="testCanvas" width="600" height="400" style="border: 1px solid black;"></canvas>
+    <p id="debug"></p>
+    
+    <script>
+    const canvas = document.getElementById('testCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Test geometry (same as direct URL)
+    const testGeometry = {
+        "type": "Polygon",
+        "coordinates": [[
+            [-82.39221, 34.85108],
+            [-82.39235, 34.85105], 
+            [-82.39260, 34.85100],
+            [-82.39262, 34.85107],
+            [-82.39236, 34.85112],
+            [-82.39227, 34.85114],
+            [-82.39223, 34.85115],
+            [-82.39221, 34.85108]
+        ]]
+    };
+    
+    function drawTest() {
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        const coords = testGeometry.coordinates[0];
+        console.log('Test coordinates:', coords);
+        
+        // Calculate bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        coords.forEach(([x, y]) => {
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+        });
+        
+        const bounds = { minX, minY, maxX, maxY };
+        const width = maxX - minX;
+        const height = maxY - minY;
+        
+        document.getElementById('debug').innerHTML = 
+            `Bounds: ${minX.toFixed(5)} to ${maxX.toFixed(5)} (width: ${width.toFixed(8)})<br>` +
+            `Bounds: ${minY.toFixed(5)} to ${maxY.toFixed(5)} (height: ${height.toFixed(8)})<br>` +
+            `Points: ${coords.length}`;
+        
+        // Draw parcel shape
+        ctx.strokeStyle = '#2c5aa0';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        
+        for (let i = 0; i < coords.length; i++) {
+            const [lon, lat] = coords[i];
+            
+            // Convert to canvas pixels (centered, scaled)
+            const margin = 50;
+            const availW = canvas.width - margin * 2;
+            const availH = canvas.height - margin * 2;
+            
+            const pctX = (lon - bounds.minX) / width;
+            const pctY = (lat - bounds.minY) / height;
+            const px = margin + pctX * availW;
+            const py = margin + (1 - pctY) * availH; // flip Y
+            
+            console.log(`Point ${i}: [${lon.toFixed(5)}, ${lat.toFixed(5)}] -> (${px.toFixed(1)}, ${py.toFixed(1)})`);
+            
+            if (i === 0) {
+                ctx.moveTo(px, py);
+            } else {
+                ctx.lineTo(px, py);
+            }
+        }
+        
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Add title
+        ctx.fillStyle = '#2c5aa0';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('TEST: Actual Parcel Shape', canvas.width/2, 25);
+        
+        console.log('Drawing complete - should see irregular polygon');
+    }
+    
+    drawTest();
+    </script>
+</body>
+</html>
