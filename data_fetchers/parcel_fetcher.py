@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+from __future__ import annotations
 try:
     import geopandas as gpd
 except ImportError:
