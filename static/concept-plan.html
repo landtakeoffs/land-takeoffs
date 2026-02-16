@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Land Takeoffs — Concept Plan</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f; --panel: #12121a; --border: #1e1e2e;
+    --cyan: #00d4ff; --green: #00ff88; --orange: #ff8800;
+    --text: #e0e0e0; --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'SF Pro', sans-serif; background: var(--bg); color: var(--text); }
+
+  .app { display: grid; grid-template-columns: 340px 1fr; grid-template-rows: 60px 1fr; height: 100vh; }
+  header { grid-column: 1 / -1; background: var(--panel); border-bottom: 1px solid var(--border);
+           display: flex; align-items: center; padding: 0 24px; gap: 16px; }
+  header h1 { font-size: 1.3em; color: var(--cyan); font-weight: 600; }
+
+  .sidebar { background: var(--panel); border-right: 1px solid var(--border);
+             overflow-y: auto; padding: 20px; }
+  .canvas-wrap { display: flex; align-items: center; justify-content: center; background: #fff; overflow: auto; }
+
+  .card { background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+          border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h3 { font-size: 0.9em; color: var(--cyan); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  label { display: block; font-size: 0.8em; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
+  input, select { width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+                  border-radius: 6px; color: var(--text); font-size: 0.9em; }
+  input:focus, select:focus { outline: none; border-color: var(--cyan); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 0.95em;
+         font-weight: 600; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
+  .btn-primary { background: var(--cyan); color: #000; }
+  .btn-primary:hover { background: #33ddff; }
+  .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+  .legend { margin-top: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.82em; padding: 3px 0; }
+  .legend-swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #ccc; flex-shrink: 0; }
+
+  .nav-links { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+  .nav-links a { color: var(--cyan); text-decoration: none; font-size: 0.9em; font-weight: 600;
+                 padding: 8px 16px; border: 1px solid var(--cyan); border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <svg width="36" height="36" viewBox="0 0 64 64"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#00ff88"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="#0a0a0f" stroke="#1e1e2e" stroke-width="2"/><path d="M12 44 L24 28 L34 36 L52 18" stroke="url(#lg)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 44 L24 28 L34 36 L52 18 L52 44 Z" fill="url(#lg)" opacity="0.15"/><circle cx="52" cy="18" r="3.5" fill="#00ff88"/></svg>
+    <div>
+      <h1>Concept Plan Generator</h1>
+      <span style="color:var(--muted);font-size:0.75em;">PRELIMINARY SITE LAYOUT</span>
+    </div>
+    <div class="nav-links">
+      <a href="/app">🗺️ Map</a>
+      <a href="/estimate">📋 Estimate</a>
+    </div>
+  </header>
+
+  <div class="sidebar">
+    <div class="card">
+      <h3>📐 Site Parameters</h3>
+      <label>Project Name</label>
+      <input type="text" id="projectName" placeholder="e.g. Pennington Ridge">
+      <label>Developer / Owner</label>
+      <input type="text" id="ownerName" placeholder="e.g. Clear Path Development">
+
+      <div class="row">
+        <div><label>Total Acreage</label><input type="number" id="totalAcres" value="25" step="0.1" min="1"></div>
+        <div><label>Lot Size (sq ft)</label><input type="number" id="lotSize" value="7000" step="500" min="2000"></div>
+      </div>
+      <div class="row">
+        <div><label>Lot Width (ft)</label><input type="number" id="lotWidth" value="70" step="5" min="30"></div>
+        <div><label>Lot Depth (ft)</label><input type="number" id="lotDepth" value="100" step="5" min="50"></div>
+      </div>
+      <label>Road Width (ft)</label>
+      <input type="number" id="roadWidth" value="50" step="2" min="24">
+
+      <div class="row">
+        <div><label>Front Setback (ft)</label><input type="number" id="setbackFront" value="25" step="5"></div>
+        <div><label>Side Setback (ft)</label><input type="number" id="setbackSide" value="10" step="5"></div>
+      </div>
+      <div class="row">
+        <div><label>Perimeter Buffer (ft)</label><input type="number" id="perimBuffer" value="50" step="10"></div>
+        <div><label>Pond Size (%)</label><input type="number" id="pondPct" value="7" step="1" min="1" max="20"></div>
+      </div>
+
+      <label>Layout Style</label>
+      <select id="layoutStyle">
+        <option value="grid">Grid Layout</option>
+        <option value="loop">Loop Road</option>
+        <option value="cul-de-sac">Cul-de-sac</option>
+      </select>
+
+      <button class="btn btn-primary" onclick="generatePlan()">⚡ Generate Concept Plan</button>
+    </div>
+
+    <div class="card">
+      <h3>📊 Summary</h3>
+      <div id="summary" style="font-size:0.85em;color:var(--muted);">
+        Configure parameters and click Generate.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🎨 Legend</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:#333;"></div> Property Boundary</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#888;"></div> Roads / ROW</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#ffffcc;border-color:#aa9;"></div> Residential Lots</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#cce5ff;border-color:#69a;"></div> Retention Pond</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#d5f5d5;border-color:#6a6;"></div> Open Space / Buffer</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:none;border:2px dashed #c66;"></div> Setback Lines</div>
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="downloadPDF()">📄 Download PDF</button>
+    <button class="btn btn-secondary" onclick="downloadPNG()" style="margin-top:8px;">🖼️ Download PNG</button>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="planCanvas" width="1100" height="850"></canvas>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('planCanvas');
+const ctx = canvas.getContext('2d');
+
+// Read URL params (from map page)
+const params = new URLSearchParams(window.location.search);
+if (params.get('acres')) document.getElementById('totalAcres').value = params.get('acres');
+if (params.get('subdiv')) document.getElementById('projectName').value = params.get('subdiv');
+if (params.get('owner')) document.getElementById('ownerName').value = params.get('owner');
+
+// Scale: figure out a good ft-per-pixel ratio
+function generatePlan() {
+  const totalAcres = parseFloat(document.getElementById('totalAcres').value);
+  const lotWidth = parseFloat(document.getElementById('lotWidth').value);
+  const lotDepth = parseFloat(document.getElementById('lotDepth').value);
+  const roadWidth = parseFloat(document.getElementById('roadWidth').value);
+  const setbackFront = parseFloat(document.getElementById('setbackFront').value);
+  const setbackSide = parseFloat(document.getElementById('setbackSide').value);
+  const perimBuffer = parseFloat(document.getElementById('perimBuffer').value);
+  const pondPct = parseFloat(document.getElementById('pondPct').value) / 100;
+  const layoutStyle = document.getElementById('layoutStyle').value;
+  const projectName = document.getElementById('projectName').value || 'Untitled Project';
+  const ownerName = document.getElementById('ownerName').value || '';
+
+  const totalSqFt = totalAcres * 43560;
+  const totalSide = Math.sqrt(totalSqFt); // approx square dimension
+
+  // Drawing area (leave room for title block)
+  const drawW = 1060;
+  const drawH = 720;
+  const titleH = 100;
+  const margin = 20;
+
+  // Scale to fit
+  const scale = Math.min((drawW - margin * 2) / totalSide, (drawH - margin * 2) / totalSide);
+
+  // Property boundary (simplified as rectangle for now, proportioned)
+  const aspect = 1.4; // slightly rectangular
+  const propW_ft = Math.sqrt(totalSqFt * aspect);
+  const propH_ft = totalSqFt / propW_ft;
+  const propW = propW_ft * scale;
+  const propH = propH_ft * scale;
+
+  // Center on canvas
+  const ox = (drawW - propW) / 2;
+  const oy = (drawH - propH) / 2;
+
+  // Clear canvas
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Buffer zone
+  const bufPx = perimBuffer * scale;
+
+  // Open space / buffer fill
+  ctx.fillStyle = '#d5f5d5';
+  ctx.fillRect(ox, oy, propW, propH);
+
+  // Developable area (inside buffer)
+  const devX = ox + bufPx;
+  const devY = oy + bufPx;
+  const devW = propW - bufPx * 2;
+  const devH = propH - bufPx * 2;
+  ctx.fillStyle = '#f5f5f0';
+  ctx.fillRect(devX, devY, devW, devH);
+
+  // Retention pond (bottom-right corner of developable area)
+  const pondArea = totalSqFt * pondPct;
+  const pondSide = Math.sqrt(pondArea);
+  const pondW = pondSide * scale * 1.5;
+  const pondH = pondSide * scale * 0.7;
+  const pondX = devX + devW - pondW - 10;
+  const pondY = devY + devH - pondH - 10;
+
+  ctx.fillStyle = '#cce5ff';
+  ctx.strokeStyle = '#4488aa';
+  ctx.lineWidth = 1.5;
+  // Draw pond as ellipse
+  ctx.beginPath();
+  ctx.ellipse(pondX + pondW / 2, pondY + pondH / 2, pondW / 2, pondH / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Pond label
+  ctx.fillStyle = '#336';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('RETENTION POND', pondX + pondW / 2, pondY + pondH / 2 + 4);
+  ctx.fillText((pondPct * 100).toFixed(0) + '% — ' + (pondArea / 43560).toFixed(2) + ' ac', pondX + pondW / 2, pondY + pondH / 2 + 18);
+
+  // Roads and lots
+  const roadPx = roadWidth * scale;
+  const lotWPx = lotWidth * scale;
+  const lotDPx = lotDepth * scale;
+  const setFPx = setbackFront * scale;
+  const setSPx = setbackSide * scale;
+
+  let lots = [];
+  let roads = [];
+  let lotNumber = 1;
+
+  if (layoutStyle === 'grid' || layoutStyle === 'cul-de-sac') {
+    // Main road horizontal through center
+    const mainRoadY = devY + devH * 0.45;
+    roads.push({ x: devX, y: mainRoadY, w: devW, h: roadPx });
+
+    // Entry road from left edge to property boundary
+    roads.push({ x: ox - 5, y: mainRoadY, w: bufPx + 10, h: roadPx });
+
+    // Side streets
+    const sideRoadSpacing = (lotWPx * 2 + setSPx * 2 + roadPx);
+    let numSideRoads = Math.floor((devW - roadPx) / sideRoadSpacing);
+    if (numSideRoads < 1) numSideRoads = 1;
+    const actualSpacing = devW / (numSideRoads + 1);
+
+    for (let i = 1; i <= numSideRoads; i++) {
+      const rx = devX + actualSpacing * i - roadPx / 2;
+      // Road goes from main road upward
+      roads.push({ x: rx, y: devY + 10, w: roadPx, h: mainRoadY - devY - 10 });
+      // Road goes from main road downward (stop before pond)
+      const bottomLimit = (i === numSideRoads) ? pondY - 10 : devY + devH - 10;
+      roads.push({ x: rx, y: mainRoadY + roadPx, w: roadPx, h: bottomLimit - mainRoadY - roadPx });
+    }
+
+    // Place lots along roads
+    // Top side of main road
+    const topLotY = mainRoadY - setFPx - lotDPx;
+    if (topLotY > devY) {
+      for (let x = devX + 10; x + lotWPx < devX + devW - 10; x += lotWPx + setSPx) {
+        // Skip if overlapping a side road
+        let overlaps = false;
+        for (const r of roads) {
+          if (r.w === roadPx) { // vertical road
+            if (x < r.x + r.w + setSPx && x + lotWPx > r.x - setSPx) overlaps = true;
+          }
+        }
+        if (!overlaps) {
+          lots.push({ x, y: topLotY, w: lotWPx, h: lotDPx, num: lotNumber++ });
+        }
+      }
+    }
+
+    // Bottom side of main road
+    const botLotY = mainRoadY + roadPx + setFPx;
+    if (botLotY + lotDPx < devY + devH) {
+      for (let x = devX + 10; x + lotWPx < devX + devW - 10; x += lotWPx + setSPx) {
+        let overlaps = false;
+        for (const r of roads) {
+          if (r.w === roadPx) {
+            if (x < r.x + r.w + setSPx && x + lotWPx > r.x - setSPx) overlaps = true;
+          }
+        }
+        // Skip if overlapping pond
+        if (x + lotWPx > pondX - 10 && botLotY + lotDPx > pondY - 10 && x < pondX + pondW + 10) overlaps = true;
+        if (!overlaps && botLotY + lotDPx < devY + devH - 10) {
+          lots.push({ x, y: botLotY, w: lotWPx, h: lotDPx, num: lotNumber++ });
+        }
+      }
+    }
+
+    // Lots along side roads
+    for (const r of roads) {
+      if (r.w !== roadPx) continue; // only vertical roads
+      // Left side of road
+      const lx = r.x - setSPx - lotWPx;
+      if (lx > devX) {
+        for (let y = r.y + 10; y + lotWPx < r.y + r.h - 10; y += lotWPx + setSPx) {
+          // Skip if too close to main road
+          if (y + lotWPx > mainRoadY - setFPx && y < mainRoadY + roadPx + setFPx) continue;
+          if (y + lotWPx > pondY - 5 && lx + lotWPx > pondX - 5) continue;
+          lots.push({ x: lx, y, w: lotWPx, h: lotWPx, num: lotNumber++, rotated: true });
+        }
+      }
+      // Right side of road
+      const rx2 = r.x + r.w + setSPx;
+      if (rx2 + lotWPx < devX + devW) {
+        for (let y = r.y + 10; y + lotWPx < r.y + r.h - 10; y += lotWPx + setSPx) {
+          if (y + lotWPx > mainRoadY - setFPx && y < mainRoadY + roadPx + setFPx) continue;
+          if (y + lotWPx > pondY - 5 && rx2 < pondX + pondW + 5) continue;
+          lots.push({ x: rx2, y, w: lotWPx, h: lotWPx, num: lotNumber++, rotated: true });
+        }
+      }
+    }
+
+    // Cul-de-sac: add bulb at end of side roads
+    if (layoutStyle === 'cul-de-sac') {
+      for (const r of roads) {
+        if (r.w !== roadPx) continue;
+        const cx = r.x + r.w / 2;
+        const cy = r.y; // top of road
+        const radius = roadPx * 1.5;
+        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+  } else if (layoutStyle === 'loop') {
+    // Loop road
+    const loopMargin = lotDPx + setFPx + 20;
+    const loopX = devX + loopMargin;
+    const loopY = devY + loopMargin;
+    const loopW = devW - loopMargin * 2;
+    const loopH = devH - loopMargin * 2;
+
+    // Draw loop road
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = roadPx;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const r = Math.min(roadPx * 3, loopW * 0.15, loopH * 0.15);
+    ctx.beginPath();
+    ctx.moveTo(loopX + r, loopY);
+    ctx.lineTo(loopX + loopW - r, loopY);
+    ctx.arcTo(loopX + loopW, loopY, loopX + loopW, loopY + r, r);
+    ctx.lineTo(loopX + loopW, loopY + loopH - r);
+    ctx.arcTo(loopX + loopW, loopY + loopH, loopX + loopW - r, loopY + loopH, r);
+    ctx.lineTo(loopX + r, loopY + loopH);
+    ctx.arcTo(loopX, loopY + loopH, loopX, loopY + loopH - r, r);
+    ctx.lineTo(loopX, loopY + r);
+    ctx.arcTo(loopX, loopY, loopX + r, loopY, r);
+    ctx.stroke();
+
+    // Entry from left
+    ctx.lineWidth = roadPx;
+    ctx.beginPath();
+    ctx.moveTo(ox - 5, loopY + loopH / 2);
+    ctx.lineTo(loopX, loopY + loopH / 2);
+    ctx.stroke();
+
+    // Lots outside the loop (top)
+    for (let x = loopX; x + lotWPx < loopX + loopW; x += lotWPx + setSPx) {
+      lots.push({ x, y: loopY - setFPx - lotDPx, w: lotWPx, h: lotDPx, num: lotNumber++ });
+    }
+    // Bottom
+    for (let x = loopX; x + lotWPx < loopX + loopW; x += lotWPx + setSPx) {
+      if (x + lotWPx > pondX - 10 && x < pondX + pondW + 10) continue;
+      lots.push({ x, y: loopY + loopH + setFPx, w: lotWPx, h: lotDPx, num: lotNumber++ });
+    }
+    // Inside the loop
+    for (let x = loopX + roadPx + setFPx; x + lotWPx < loopX + loopW - roadPx - setFPx; x += lotWPx + setSPx) {
+      lots.push({ x, y: loopY + roadPx + setFPx, w: lotWPx, h: lotDPx, num: lotNumber++ });
+    }
+  }
+
+  // Draw roads (for grid layout)
+  ctx.fillStyle = '#888';
+  for (const r of roads) {
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
+
+  // Road labels
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (const r of roads) {
+    if (r.h === roadPx) { // horizontal road
+      ctx.fillText('MAIN ROAD (50\' ROW)', r.x + r.w / 2, r.y + roadPx / 2 + 3);
+    }
+  }
+
+  // Draw lots
+  for (const lot of lots) {
+    // Lot fill
+    ctx.fillStyle = '#ffffcc';
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 0.8;
+    ctx.fillRect(lot.x, lot.y, lot.w, lot.h);
+    ctx.strokeRect(lot.x, lot.y, lot.w, lot.h);
+
+    // Setback dashed line
+    ctx.strokeStyle = '#cc6666';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([3, 3]);
+    const sb = setSPx * 0.5;
+    ctx.strokeRect(lot.x + sb, lot.y + sb, lot.w - sb * 2, lot.h - sb * 2);
+    ctx.setLineDash([]);
+
+    // Lot number
+    ctx.fillStyle = '#333';
+    ctx.font = '9px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Lot ' + lot.num, lot.x + lot.w / 2, lot.y + lot.h / 2 + 3);
+  }
+
+  // Property boundary
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(ox, oy, propW, propH);
+
+  // Buffer dashed line
+  ctx.strokeStyle = '#6a6';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(ox + bufPx, oy + bufPx, propW - bufPx * 2, propH - bufPx * 2);
+  ctx.setLineDash([]);
+
+  // Dimension labels on boundary
+  ctx.fillStyle = '#333';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(propW_ft.toFixed(0) + '\'', ox + propW / 2, oy - 8);
+  ctx.save();
+  ctx.translate(ox - 10, oy + propH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(propH_ft.toFixed(0) + '\'', 0, 0);
+  ctx.restore();
+
+  // North arrow
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  const naX = ox + propW + 30;
+  const naY = oy + 30;
+  ctx.fillText('N', naX, naY - 8);
+  ctx.beginPath();
+  ctx.moveTo(naX, naY);
+  ctx.lineTo(naX - 6, naY + 18);
+  ctx.lineTo(naX, naY + 14);
+  ctx.lineTo(naX + 6, naY + 18);
+  ctx.closePath();
+  ctx.fill();
+
+  // Open space labels
+  ctx.fillStyle = '#4a4';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('OPEN SPACE / BUFFER', ox + propW / 2, oy + bufPx / 2 + 3);
+  ctx.fillText('BUFFER', ox + bufPx / 2, oy + propH / 2);
+
+  // ---- Title Block ----
+  const tbY = drawH + 10;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, tbY, canvas.width, titleH);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(10, tbY, canvas.width - 20, titleH - 10);
+
+  // Dividers
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(canvas.width * 0.45, tbY);
+  ctx.lineTo(canvas.width * 0.45, tbY + titleH - 10);
+  ctx.moveTo(canvas.width * 0.75, tbY);
+  ctx.lineTo(canvas.width * 0.75, tbY + titleH - 10);
+  ctx.stroke();
+
+  // Left: project info
+  ctx.fillStyle = '#111';
+  ctx.font = 'bold 16px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(projectName.toUpperCase(), 24, tbY + 28);
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.fillStyle = '#555';
+  ctx.fillText('PRELIMINARY CONCEPT PLAN', 24, tbY + 46);
+  if (ownerName) ctx.fillText('Developer: ' + ownerName, 24, tbY + 62);
+  ctx.fillText(totalAcres.toFixed(2) + ' Acres — ' + lots.length + ' Lots', 24, tbY + 78);
+
+  // Middle: details
+  const mx = canvas.width * 0.45 + 16;
+  ctx.fillStyle = '#111';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText('Lot Size: ' + lotWidth + '\' × ' + lotDepth + '\'', mx, tbY + 22);
+  ctx.fillText('Road ROW: ' + roadWidth + '\'', mx, tbY + 36);
+  ctx.fillText('Setbacks: ' + setbackFront + '\' front / ' + setbackSide + '\' side', mx, tbY + 50);
+  ctx.fillText('Buffer: ' + perimBuffer + '\'  |  Pond: ' + (pondPct * 100).toFixed(0) + '%', mx, tbY + 64);
+  ctx.fillText('Layout: ' + layoutStyle.charAt(0).toUpperCase() + layoutStyle.slice(1), mx, tbY + 78);
+
+  // Right: branding
+  const rx = canvas.width * 0.75 + 16;
+  ctx.fillStyle = '#00a0cc';
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.fillText('Land Takeoffs', rx, tbY + 28);
+  ctx.fillStyle = '#888';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText('landtakeoffs.com', rx, tbY + 44);
+  ctx.fillText('CONCEPT PLAN — NOT FOR CONSTRUCTION', rx, tbY + 60);
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  ctx.fillText('Date: ' + today, rx, tbY + 76);
+
+  // ---- Scale Bar ----
+  const scaleBarFt = Math.round(100 / scale / 50) * 50 || 50; // round to nice number
+  const scaleBarPx = scaleBarFt * scale;
+  const sbX = ox;
+  const sbY2 = oy + propH + 20;
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(sbX, sbY2); ctx.lineTo(sbX + scaleBarPx, sbY2);
+  ctx.moveTo(sbX, sbY2 - 4); ctx.lineTo(sbX, sbY2 + 4);
+  ctx.moveTo(sbX + scaleBarPx, sbY2 - 4); ctx.lineTo(sbX + scaleBarPx, sbY2 + 4);
+  ctx.stroke();
+  ctx.fillStyle = '#333';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('0', sbX, sbY2 + 14);
+  ctx.fillText(scaleBarFt + ' ft', sbX + scaleBarPx, sbY2 + 14);
+
+  // Update summary
+  const netDevelopable = totalAcres * 0.52;
+  const openSpaceAc = totalAcres * 0.15;
+  const roadAc = totalAcres * 0.22;
+  const pondAc = totalAcres * pondPct;
+  const density = lots.length / totalAcres;
+
+  document.getElementById('summary').innerHTML = `
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span>Total Lots</span><b style="color:var(--cyan)">${lots.length}</b>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span>Density</span><b>${density.toFixed(1)} lots/acre</b>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span>Net Developable</span><b>${netDevelopable.toFixed(1)} ac (52%)</b>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span>Roads / ROW</span><b>${roadAc.toFixed(1)} ac (22%)</b>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span>Open Space</span><b>${openSpaceAc.toFixed(1)} ac (15%)</b>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span>Stormwater</span><b>${pondAc.toFixed(1)} ac (${(pondPct * 100).toFixed(0)}%)</b>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;">
+      <span>Lot Size</span><b>${lotWidth}' × ${lotDepth}' (${(lotWidth * lotDepth).toLocaleString()} sf)</b>
+    </div>
+  `;
+}
+
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+  const name = document.getElementById('projectName').value || 'concept-plan';
+  pdf.save(name.replace(/\s+/g, '-').toLowerCase() + '-concept-plan.pdf');
+}
+
+function downloadPNG() {
+  const link = document.createElement('a');
+  const name = document.getElementById('projectName').value || 'concept-plan';
+  link.download = name.replace(/\s+/g, '-').toLowerCase() + '-concept-plan.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// Generate on load
+generatePlan();
+</script>
+</body>
+</html>

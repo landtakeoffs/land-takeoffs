@@ -364,5 +364,12 @@ def estimate_page():
     return app.send_static_file("estimate.html")
 
 
+@app.route("/concept-plan", methods=["GET"])
+@app.route("/app/concept-plan", methods=["GET"])
+def concept_plan_page():
+    """Serve the concept plan generator."""
+    return app.send_static_file("concept-plan.html")
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
