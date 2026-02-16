@@ -141,7 +141,21 @@ if (params.get('acres')) document.getElementById('totalAcres').value = params.ge
 if (params.get('subdiv')) document.getElementById('projectName').value = params.get('subdiv');
 if (params.get('owner')) document.getElementById('ownerName').value = params.get('owner');
 
-// Scale: figure out a good ft-per-pixel ratio
+/* =============================================
+   COLLISION GRID — prevents any overlap
+   ============================================= */
+class CollisionGrid {
+  constructor(w, h) { this.w = w; this.h = h; this.rects = []; }
+  add(x, y, w, h, type) { this.rects.push({ x, y, w, h, type }); }
+  fits(x, y, w, h, pad = 0) {
+    if (x - pad < 0 || y - pad < 0 || x + w + pad > this.w || y + h + pad > this.h) return false;
+    for (const r of this.rects) {
+      if (x < r.x + r.w + pad && x + w + pad > r.x && y < r.y + r.h + pad && y + h + pad > r.y) return false;
+    }
+    return true;
+  }
+}
+
 function generatePlan() {
   const totalAcres = parseFloat(document.getElementById('totalAcres').value);
   const lotWidth = parseFloat(document.getElementById('lotWidth').value);
@@ -156,409 +170,542 @@ function generatePlan() {
   const ownerName = document.getElementById('ownerName').value || '';
 
   const totalSqFt = totalAcres * 43560;
-  const totalSide = Math.sqrt(totalSqFt); // approx square dimension
 
-  // Drawing area (leave room for title block)
-  const drawW = 1060;
-  const drawH = 720;
-  const titleH = 100;
-  const margin = 20;
+  // Drawing area
+  const drawW = 1060, drawH = 720, titleH = 100, margin = 40;
 
-  // Scale to fit
-  const scale = Math.min((drawW - margin * 2) / totalSide, (drawH - margin * 2) / totalSide);
-
-  // Property boundary (simplified as rectangle for now, proportioned)
-  const aspect = 1.4; // slightly rectangular
+  // Property proportions — slightly rectangular
+  const aspect = 1.35;
   const propW_ft = Math.sqrt(totalSqFt * aspect);
   const propH_ft = totalSqFt / propW_ft;
+
+  // Scale to fit with margin
+  const scale = Math.min((drawW - margin * 2) / propW_ft, (drawH - margin * 2) / propH_ft);
   const propW = propW_ft * scale;
   const propH = propH_ft * scale;
-
-  // Center on canvas
   const ox = (drawW - propW) / 2;
   const oy = (drawH - propH) / 2;
 
-  // Clear canvas
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Buffer zone
+  // Pixel conversions
   const bufPx = perimBuffer * scale;
-
-  // Open space / buffer fill
-  ctx.fillStyle = '#d5f5d5';
-  ctx.fillRect(ox, oy, propW, propH);
+  const roadPx = roadWidth * scale;
+  const lotWPx = lotWidth * scale;
+  const lotDPx = lotDepth * scale;
+  const gap = 2; // pixel gap between lots (thin lot line)
 
   // Developable area (inside buffer)
   const devX = ox + bufPx;
   const devY = oy + bufPx;
   const devW = propW - bufPx * 2;
   const devH = propH - bufPx * 2;
-  ctx.fillStyle = '#f5f5f0';
-  ctx.fillRect(devX, devY, devW, devH);
 
-  // Retention pond (bottom-right corner of developable area)
+  // Collision grid
+  const grid = new CollisionGrid(canvas.width, canvas.height);
+
+  // Pond placement — bottom-right of developable area
   const pondArea = totalSqFt * pondPct;
-  const pondSide = Math.sqrt(pondArea);
-  const pondW = pondSide * scale * 1.5;
-  const pondH = pondSide * scale * 0.7;
-  const pondX = devX + devW - pondW - 10;
-  const pondY = devY + devH - pondH - 10;
+  const pondRx = Math.sqrt(pondArea) * scale * 0.75;
+  const pondRy = pondRx * 0.55;
+  const pondCx = devX + devW - pondRx - 15;
+  const pondCy = devY + devH - pondRy - 15;
+  // Reserve pond as rectangular bounding box in collision grid
+  grid.add(pondCx - pondRx - 10, pondCy - pondRy - 10, pondRx * 2 + 20, pondRy * 2 + 20, 'pond');
 
-  ctx.fillStyle = '#cce5ff';
-  ctx.strokeStyle = '#4488aa';
-  ctx.lineWidth = 1.5;
-  // Draw pond as ellipse
-  ctx.beginPath();
-  ctx.ellipse(pondX + pondW / 2, pondY + pondH / 2, pondW / 2, pondH / 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  // Pond label
-  ctx.fillStyle = '#336';
-  ctx.font = '11px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('RETENTION POND', pondX + pondW / 2, pondY + pondH / 2 + 4);
-  ctx.fillText((pondPct * 100).toFixed(0) + '% — ' + (pondArea / 43560).toFixed(2) + ' ac', pondX + pondW / 2, pondY + pondH / 2 + 18);
-
-  // Roads and lots
-  const roadPx = roadWidth * scale;
-  const lotWPx = lotWidth * scale;
-  const lotDPx = lotDepth * scale;
-  const setFPx = setbackFront * scale;
-  const setSPx = setbackSide * scale;
-
-  let lots = [];
+  // ---- ROAD LAYOUT ----
   let roads = [];
   let lotNumber = 1;
+  let lots = [];
 
-  if (layoutStyle === 'grid' || layoutStyle === 'cul-de-sac') {
-    // Main road horizontal through center
-    const mainRoadY = devY + devH * 0.45;
-    roads.push({ x: devX, y: mainRoadY, w: devW, h: roadPx });
+  if (layoutStyle === 'grid') {
+    // Collector road — horizontal, roughly 40% from top
+    const mainY = devY + devH * 0.42;
+    roads.push({ x: devX, y: mainY, w: devW, h: roadPx, label: projectName.toUpperCase() + ' DR', type: 'main' });
+    grid.add(devX, mainY, devW, roadPx, 'road');
 
-    // Entry road from left edge to property boundary
-    roads.push({ x: ox - 5, y: mainRoadY, w: bufPx + 10, h: roadPx });
+    // Entry stub from property line
+    roads.push({ x: ox, y: mainY, w: bufPx, h: roadPx, type: 'entry' });
 
-    // Side streets
-    const sideRoadSpacing = (lotWPx * 2 + setSPx * 2 + roadPx);
-    let numSideRoads = Math.floor((devW - roadPx) / sideRoadSpacing);
-    if (numSideRoads < 1) numSideRoads = 1;
-    const actualSpacing = devW / (numSideRoads + 1);
+    // Calculate side streets — evenly spaced, each side street has lots on both sides
+    const blockWidth = lotWPx * 2 + gap * 2 + roadPx; // two lots wide + road
+    const availW = devW - roadPx; // minus end margins
+    let numBlocks = Math.max(1, Math.floor(availW / (blockWidth + lotWPx)));
+    const streetSpacing = devW / (numBlocks + 1);
 
-    for (let i = 1; i <= numSideRoads; i++) {
-      const rx = devX + actualSpacing * i - roadPx / 2;
-      // Road goes from main road upward
-      roads.push({ x: rx, y: devY + 10, w: roadPx, h: mainRoadY - devY - 10 });
-      // Road goes from main road downward (stop before pond)
-      const bottomLimit = (i === numSideRoads) ? pondY - 10 : devY + devH - 10;
-      roads.push({ x: rx, y: mainRoadY + roadPx, w: roadPx, h: bottomLimit - mainRoadY - roadPx });
-    }
-
-    // Place lots along roads
-    // Top side of main road
-    const topLotY = mainRoadY - setFPx - lotDPx;
-    if (topLotY > devY) {
-      for (let x = devX + 10; x + lotWPx < devX + devW - 10; x += lotWPx + setSPx) {
-        // Skip if overlapping a side road
-        let overlaps = false;
-        for (const r of roads) {
-          if (r.w === roadPx) { // vertical road
-            if (x < r.x + r.w + setSPx && x + lotWPx > r.x - setSPx) overlaps = true;
-          }
-        }
-        if (!overlaps) {
-          lots.push({ x, y: topLotY, w: lotWPx, h: lotDPx, num: lotNumber++ });
-        }
+    for (let i = 0; i < numBlocks; i++) {
+      const sx = devX + streetSpacing * (i + 1) - roadPx / 2;
+      // Street above main road
+      const topLen = mainY - devY;
+      if (topLen > roadPx * 2) {
+        roads.push({ x: sx, y: devY, w: roadPx, h: topLen, label: 'ST ' + String.fromCharCode(65 + i), type: 'side' });
+        grid.add(sx, devY, roadPx, topLen, 'road');
+      }
+      // Street below main road
+      const botStart = mainY + roadPx;
+      const botLen = devY + devH - botStart;
+      if (botLen > roadPx * 2) {
+        roads.push({ x: sx, y: botStart, w: roadPx, h: botLen, type: 'side' });
+        grid.add(sx, botStart, roadPx, botLen, 'road');
       }
     }
 
-    // Bottom side of main road
-    const botLotY = mainRoadY + roadPx + setFPx;
-    if (botLotY + lotDPx < devY + devH) {
-      for (let x = devX + 10; x + lotWPx < devX + devW - 10; x += lotWPx + setSPx) {
-        let overlaps = false;
-        for (const r of roads) {
-          if (r.w === roadPx) {
-            if (x < r.x + r.w + setSPx && x + lotWPx > r.x - setSPx) overlaps = true;
-          }
-        }
-        // Skip if overlapping pond
-        if (x + lotWPx > pondX - 10 && botLotY + lotDPx > pondY - 10 && x < pondX + pondW + 10) overlaps = true;
-        if (!overlaps && botLotY + lotDPx < devY + devH - 10) {
-          lots.push({ x, y: botLotY, w: lotWPx, h: lotDPx, num: lotNumber++ });
-        }
-      }
-    }
+    // ---- PLACE LOTS ----
+    // Strategy: walk each road segment and place lots on both sides
+    for (const road of roads) {
+      if (road.type === 'entry') continue;
 
-    // Lots along side roads
-    for (const r of roads) {
-      if (r.w !== roadPx) continue; // only vertical roads
-      // Left side of road
-      const lx = r.x - setSPx - lotWPx;
-      if (lx > devX) {
-        for (let y = r.y + 10; y + lotWPx < r.y + r.h - 10; y += lotWPx + setSPx) {
-          // Skip if too close to main road
-          if (y + lotWPx > mainRoadY - setFPx && y < mainRoadY + roadPx + setFPx) continue;
-          if (y + lotWPx > pondY - 5 && lx + lotWPx > pondX - 5) continue;
-          lots.push({ x: lx, y, w: lotWPx, h: lotWPx, num: lotNumber++, rotated: true });
-        }
-      }
-      // Right side of road
-      const rx2 = r.x + r.w + setSPx;
-      if (rx2 + lotWPx < devX + devW) {
-        for (let y = r.y + 10; y + lotWPx < r.y + r.h - 10; y += lotWPx + setSPx) {
-          if (y + lotWPx > mainRoadY - setFPx && y < mainRoadY + roadPx + setFPx) continue;
-          if (y + lotWPx > pondY - 5 && rx2 < pondX + pondW + 5) continue;
-          lots.push({ x: rx2, y, w: lotWPx, h: lotWPx, num: lotNumber++, rotated: true });
-        }
-      }
-    }
-
-    // Cul-de-sac: add bulb at end of side roads
-    if (layoutStyle === 'cul-de-sac') {
-      for (const r of roads) {
-        if (r.w !== roadPx) continue;
-        const cx = r.x + r.w / 2;
-        const cy = r.y; // top of road
-        const radius = roadPx * 1.5;
-        ctx.fillStyle = '#888';
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.fill();
+      if (road.h === roadPx) {
+        // HORIZONTAL road → lots above and below
+        placeLotRow(road.x, road.y - lotDPx - gap, road.w, lotWPx, lotDPx, gap, 'above');
+        placeLotRow(road.x, road.y + roadPx + gap, road.w, lotWPx, lotDPx, gap, 'below');
+      } else {
+        // VERTICAL road → lots left and right
+        placeLotCol(road.x - lotWPx - gap, road.y, road.h, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(road.x + roadPx + gap, road.y, road.h, lotWPx, lotDPx, gap, 'right');
       }
     }
 
   } else if (layoutStyle === 'loop') {
-    // Loop road
-    const loopMargin = lotDPx + setFPx + 20;
-    const loopX = devX + loopMargin;
-    const loopY = devY + loopMargin;
-    const loopW = devW - loopMargin * 2;
-    const loopH = devH - loopMargin * 2;
+    // Loop road with lots inside and outside
+    const loopPad = lotDPx + gap + 20;
+    const loopX = devX + loopPad;
+    const loopY = devY + loopPad;
+    const loopW = devW - loopPad * 2;
+    const loopH = devH - loopPad * 2;
+    const cornerR = Math.min(roadPx * 4, loopW * 0.12, loopH * 0.12);
 
-    // Draw loop road
-    ctx.strokeStyle = '#888';
-    ctx.lineWidth = roadPx;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    const r = Math.min(roadPx * 3, loopW * 0.15, loopH * 0.15);
-    ctx.beginPath();
-    ctx.moveTo(loopX + r, loopY);
-    ctx.lineTo(loopX + loopW - r, loopY);
-    ctx.arcTo(loopX + loopW, loopY, loopX + loopW, loopY + r, r);
-    ctx.lineTo(loopX + loopW, loopY + loopH - r);
-    ctx.arcTo(loopX + loopW, loopY + loopH, loopX + loopW - r, loopY + loopH, r);
-    ctx.lineTo(loopX + r, loopY + loopH);
-    ctx.arcTo(loopX, loopY + loopH, loopX, loopY + loopH - r, r);
-    ctx.lineTo(loopX, loopY + r);
-    ctx.arcTo(loopX, loopY, loopX + r, loopY, r);
-    ctx.stroke();
+    // Add loop road segments to collision grid (top, right, bottom, left)
+    grid.add(loopX, loopY - roadPx / 2, loopW, roadPx, 'road');
+    grid.add(loopX + loopW - roadPx / 2, loopY, roadPx, loopH, 'road');
+    grid.add(loopX, loopY + loopH - roadPx / 2, loopW, roadPx, 'road');
+    grid.add(loopX - roadPx / 2, loopY, roadPx, loopH, 'road');
 
-    // Entry from left
-    ctx.lineWidth = roadPx;
-    ctx.beginPath();
-    ctx.moveTo(ox - 5, loopY + loopH / 2);
-    ctx.lineTo(loopX, loopY + loopH / 2);
-    ctx.stroke();
+    // Entry road
+    roads.push({ x: ox, y: loopY + loopH / 2 - roadPx / 2, w: loopX - ox + roadPx, h: roadPx, type: 'entry' });
 
-    // Lots outside the loop (top)
-    for (let x = loopX; x + lotWPx < loopX + loopW; x += lotWPx + setSPx) {
-      lots.push({ x, y: loopY - setFPx - lotDPx, w: lotWPx, h: lotDPx, num: lotNumber++ });
+    roads.push({ type: 'loop', x: loopX, y: loopY, w: loopW, h: loopH, r: cornerR, roadPx, label: projectName.toUpperCase() + ' LOOP' });
+
+    // Lots outside loop — top
+    placeLotRow(loopX + cornerR, loopY - roadPx / 2 - gap - lotDPx, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'above');
+    // Outside — bottom
+    placeLotRow(loopX + cornerR, loopY + loopH + roadPx / 2 + gap, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'below');
+    // Outside — left
+    placeLotCol(loopX - roadPx / 2 - gap - lotWPx, loopY + cornerR, loopH - cornerR * 2, lotWPx, lotDPx, gap, 'left');
+    // Outside — right
+    placeLotCol(loopX + loopW + roadPx / 2 + gap, loopY + cornerR, loopH - cornerR * 2, lotWPx, lotDPx, gap, 'right');
+
+    // Inside loop — rows of lots
+    const insideX = loopX + roadPx / 2 + gap;
+    const insideY = loopY + roadPx / 2 + gap;
+    const insideW = loopW - roadPx - gap * 2;
+    const insideH = loopH - roadPx - gap * 2;
+    // Fill inside with horizontal rows
+    for (let y = insideY; y + lotDPx < insideY + insideH; y += lotDPx + gap) {
+      for (let x = insideX; x + lotWPx < insideX + insideW; x += lotWPx + gap) {
+        if (grid.fits(x, y, lotWPx, lotDPx, 1)) {
+          lots.push({ x, y, w: lotWPx, h: lotDPx, num: lotNumber++ });
+          grid.add(x, y, lotWPx, lotDPx, 'lot');
+        }
+      }
     }
-    // Bottom
-    for (let x = loopX; x + lotWPx < loopX + loopW; x += lotWPx + setSPx) {
-      if (x + lotWPx > pondX - 10 && x < pondX + pondW + 10) continue;
-      lots.push({ x, y: loopY + loopH + setFPx, w: lotWPx, h: lotDPx, num: lotNumber++ });
+
+  } else if (layoutStyle === 'cul-de-sac') {
+    // Main road with cul-de-sac branches
+    const mainY = devY + devH * 0.5 - roadPx / 2;
+    roads.push({ x: devX, y: mainY, w: devW, h: roadPx, label: projectName.toUpperCase() + ' DR', type: 'main' });
+    grid.add(devX, mainY, devW, roadPx, 'road');
+    roads.push({ x: ox, y: mainY, w: bufPx, h: roadPx, type: 'entry' });
+
+    // Cul-de-sac branches going up and down
+    const bulbR = roadPx * 2;
+    const branchLen = (devH - roadPx) / 2 - bulbR - 20;
+    const numBranches = Math.max(1, Math.floor(devW / (lotWPx * 3 + roadPx * 2)));
+    const branchSpacing = devW / (numBranches + 1);
+
+    for (let i = 0; i < numBranches; i++) {
+      const bx = devX + branchSpacing * (i + 1) - roadPx / 2;
+
+      // Branch up
+      if (branchLen > lotDPx) {
+        const topY = mainY - branchLen;
+        roads.push({ x: bx, y: topY + bulbR, w: roadPx, h: branchLen - bulbR, type: 'side' });
+        grid.add(bx, topY + bulbR, roadPx, branchLen - bulbR, 'road');
+        roads.push({ type: 'bulb', cx: bx + roadPx / 2, cy: topY + bulbR, r: bulbR });
+        grid.add(bx - bulbR, topY, bulbR * 2 + roadPx, bulbR * 2, 'road');
+
+        placeLotCol(bx - lotWPx - gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + roadPx + gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+      }
+
+      // Branch down
+      if (branchLen > lotDPx) {
+        const botStart = mainY + roadPx;
+        roads.push({ x: bx, y: botStart, w: roadPx, h: branchLen - bulbR, type: 'side' });
+        grid.add(bx, botStart, roadPx, branchLen - bulbR, 'road');
+        roads.push({ type: 'bulb', cx: bx + roadPx / 2, cy: botStart + branchLen - bulbR, r: bulbR });
+        grid.add(bx - bulbR, botStart + branchLen - bulbR * 2, bulbR * 2 + roadPx, bulbR * 2, 'road');
+
+        placeLotCol(bx - lotWPx - gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + roadPx + gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+      }
     }
-    // Inside the loop
-    for (let x = loopX + roadPx + setFPx; x + lotWPx < loopX + loopW - roadPx - setFPx; x += lotWPx + setSPx) {
-      lots.push({ x, y: loopY + roadPx + setFPx, w: lotWPx, h: lotDPx, num: lotNumber++ });
+
+    // Lots along main road (between branches)
+    placeLotRow(devX, mainY - lotDPx - gap, devW, lotWPx, lotDPx, gap, 'above');
+    placeLotRow(devX, mainY + roadPx + gap, devW, lotWPx, lotDPx, gap, 'below');
+  }
+
+  // ---- Lot placement helpers (use collision grid) ----
+  function placeLotRow(startX, y, length, lw, lh, g, side) {
+    if (y < oy || y + lh > oy + propH) return; // outside property
+    for (let x = startX + g; x + lw <= startX + length - g; x += lw + g) {
+      if (x < devX || x + lw > devX + devW) continue;
+      if (y < devY || y + lh > devY + devH) continue;
+      if (grid.fits(x, y, lw, lh, 1)) {
+        lots.push({ x, y, w: lw, h: lh, num: lotNumber++ });
+        grid.add(x, y, lw, lh, 'lot');
+      }
     }
   }
 
-  // Draw roads (for grid layout)
-  ctx.fillStyle = '#888';
+  function placeLotCol(x, startY, length, lw, lh, g, side) {
+    if (x < oy || x + lw > devX + devW) return;
+    // For vertical placement, lots are rotated: width along road, depth perpendicular
+    const lotW = lw;
+    const lotH = lw; // square-ish lots along side streets — use lotWidth for both
+    for (let y = startY + g; y + lotH <= startY + length - g; y += lotH + g) {
+      if (y < devY || y + lotH > devY + devH) continue;
+      if (x < devX) continue;
+      if (grid.fits(x, y, lotW, lotH, 1)) {
+        lots.push({ x, y, w: lotW, h: lotH, num: lotNumber++ });
+        grid.add(x, y, lotW, lotH, 'lot');
+      }
+    }
+  }
+
+  // =============================================
+  //  DRAWING
+  // =============================================
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Buffer / open space fill
+  ctx.fillStyle = '#e8f5e8';
+  ctx.fillRect(ox, oy, propW, propH);
+
+  // Developable area
+  ctx.fillStyle = '#f8f8f4';
+  ctx.fillRect(devX, devY, devW, devH);
+
+  // ---- Draw roads ----
+  ctx.fillStyle = '#d0d0d0';
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 0.5;
   for (const r of roads) {
-    ctx.fillRect(r.x, r.y, r.w, r.h);
+    if (r.type === 'loop') {
+      // Draw rounded loop
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = r.roadPx;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      const cr = r.r;
+      ctx.beginPath();
+      ctx.moveTo(r.x + cr, r.y);
+      ctx.lineTo(r.x + r.w - cr, r.y);
+      ctx.arcTo(r.x + r.w, r.y, r.x + r.w, r.y + cr, cr);
+      ctx.lineTo(r.x + r.w, r.y + r.h - cr);
+      ctx.arcTo(r.x + r.w, r.y + r.h, r.x + r.w - cr, r.y + r.h, cr);
+      ctx.lineTo(r.x + cr, r.y + r.h);
+      ctx.arcTo(r.x, r.y + r.h, r.x, r.y + r.h - cr, cr);
+      ctx.lineTo(r.x, r.y + cr);
+      ctx.arcTo(r.x, r.y, r.x + cr, r.y, cr);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.lineWidth = 0.5;
+    } else if (r.type === 'bulb') {
+      // Cul-de-sac bulb
+      ctx.fillStyle = '#d0d0d0';
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(r.cx, r.cy, r.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#d0d0d0';
+      roundRect(r.x, r.y, r.w, r.h, 2);
+      ctx.fill();
+      // Road center line
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      if (r.w > r.h) {
+        // Horizontal
+        ctx.beginPath();
+        ctx.moveTo(r.x + 4, r.y + r.h / 2);
+        ctx.lineTo(r.x + r.w - 4, r.y + r.h / 2);
+        ctx.stroke();
+      } else {
+        // Vertical
+        ctx.beginPath();
+        ctx.moveTo(r.x + r.w / 2, r.y + 4);
+        ctx.lineTo(r.x + r.w / 2, r.y + r.h - 4);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
   }
 
   // Road labels
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 10px -apple-system, sans-serif';
+  ctx.fillStyle = '#666';
+  ctx.font = 'bold 9px -apple-system, sans-serif';
   ctx.textAlign = 'center';
   for (const r of roads) {
-    if (r.h === roadPx) { // horizontal road
-      ctx.fillText('MAIN ROAD (50\' ROW)', r.x + r.w / 2, r.y + roadPx / 2 + 3);
+    if (!r.label) continue;
+    if (r.w > r.h) {
+      ctx.fillText(r.label + '  (' + roadWidth + '\' ROW)', r.x + r.w / 2, r.y + r.h / 2 + 3);
+    } else {
+      ctx.save();
+      ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(r.label, 0, 3);
+      ctx.restore();
     }
   }
 
-  // Draw lots
+  // ---- Draw lots ----
   for (const lot of lots) {
-    // Lot fill
-    ctx.fillStyle = '#ffffcc';
-    ctx.strokeStyle = '#999';
+    // Fill
+    ctx.fillStyle = '#fffde6';
+    ctx.strokeStyle = '#bba';
     ctx.lineWidth = 0.8;
-    ctx.fillRect(lot.x, lot.y, lot.w, lot.h);
-    ctx.strokeRect(lot.x, lot.y, lot.w, lot.h);
+    roundRect(lot.x, lot.y, lot.w, lot.h, 1);
+    ctx.fill();
+    ctx.stroke();
 
-    // Setback dashed line
-    ctx.strokeStyle = '#cc6666';
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([3, 3]);
-    const sb = setSPx * 0.5;
-    ctx.strokeRect(lot.x + sb, lot.y + sb, lot.w - sb * 2, lot.h - sb * 2);
+    // Setback dashed line (building envelope)
+    const sbx = Math.min(lot.w * 0.15, 8);
+    const sby = Math.min(lot.h * 0.15, 8);
+    ctx.strokeStyle = 'rgba(180,80,80,0.35)';
+    ctx.lineWidth = 0.4;
+    ctx.setLineDash([2, 2]);
+    ctx.strokeRect(lot.x + sbx, lot.y + sby, lot.w - sbx * 2, lot.h - sby * 2);
     ctx.setLineDash([]);
 
     // Lot number
-    ctx.fillStyle = '#333';
-    ctx.font = '9px -apple-system, sans-serif';
+    ctx.fillStyle = '#555';
+    ctx.font = Math.min(9, lot.w * 0.18) + 'px -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Lot ' + lot.num, lot.x + lot.w / 2, lot.y + lot.h / 2 + 3);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(lot.num, lot.x + lot.w / 2, lot.y + lot.h / 2);
   }
+  ctx.textBaseline = 'alphabetic';
 
-  // Property boundary
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 2.5;
+  // ---- Retention pond ----
+  // Outer glow
+  const pgrd = ctx.createRadialGradient(pondCx, pondCy, 0, pondCx, pondCy, Math.max(pondRx, pondRy) * 1.2);
+  pgrd.addColorStop(0, '#b8ddf0');
+  pgrd.addColorStop(0.7, '#cce8f5');
+  pgrd.addColorStop(1, '#e8f5e8');
+  ctx.fillStyle = pgrd;
+  ctx.beginPath();
+  ctx.ellipse(pondCx, pondCy, pondRx + 8, pondRy + 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Pond body
+  ctx.fillStyle = '#b5d8eb';
+  ctx.strokeStyle = '#6099b0';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(pondCx, pondCy, pondRx, pondRy, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Pond label
+  ctx.fillStyle = '#3a6a80';
+  ctx.font = 'bold 10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('RETENTION', pondCx, pondCy - 4);
+  ctx.fillText('POND', pondCx, pondCy + 9);
+  ctx.font = '8px -apple-system, sans-serif';
+  ctx.fillStyle = '#5a8a9a';
+  ctx.fillText((pondArea / 43560).toFixed(2) + ' ac', pondCx, pondCy + 21);
+
+  // ---- Property boundary ----
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 3;
   ctx.strokeRect(ox, oy, propW, propH);
 
-  // Buffer dashed line
-  ctx.strokeStyle = '#6a6';
+  // Buffer line
+  ctx.strokeStyle = '#5a5';
   ctx.lineWidth = 1;
-  ctx.setLineDash([6, 4]);
-  ctx.strokeRect(ox + bufPx, oy + bufPx, propW - bufPx * 2, propH - bufPx * 2);
+  ctx.setLineDash([8, 5]);
+  ctx.strokeRect(devX, devY, devW, devH);
   ctx.setLineDash([]);
 
-  // Dimension labels on boundary
+  // Dimension labels
   ctx.fillStyle = '#333';
   ctx.font = '11px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(propW_ft.toFixed(0) + '\'', ox + propW / 2, oy - 8);
+  // Top dimension
+  drawDimension(ox, oy - 18, ox + propW, oy - 18, propW_ft.toFixed(0) + '\'');
+  // Left dimension
   ctx.save();
-  ctx.translate(ox - 10, oy + propH / 2);
+  ctx.translate(ox - 18, oy + propH / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText(propH_ft.toFixed(0) + '\'', 0, 0);
   ctx.restore();
 
-  // North arrow
-  ctx.fillStyle = '#333';
-  ctx.font = 'bold 14px -apple-system, sans-serif';
+  // Buffer labels
+  ctx.fillStyle = '#5a5';
+  ctx.font = '9px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  const naX = ox + propW + 30;
-  const naY = oy + 30;
-  ctx.fillText('N', naX, naY - 8);
+  if (bufPx > 30) {
+    ctx.fillText('BUFFER ' + perimBuffer + '\'', ox + bufPx / 2 + 10, oy + propH / 2);
+    ctx.fillText('OPEN SPACE', ox + propW / 2, oy + bufPx / 2 + 2);
+  }
+
+  // ---- North arrow ----
+  const naX = ox + propW + 35, naY = oy + 20;
+  ctx.fillStyle = '#333';
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(naX, naY);
-  ctx.lineTo(naX - 6, naY + 18);
-  ctx.lineTo(naX, naY + 14);
-  ctx.lineTo(naX + 6, naY + 18);
+  ctx.lineTo(naX - 5, naY + 20);
+  ctx.lineTo(naX, naY + 16);
+  ctx.lineTo(naX + 5, naY + 20);
   ctx.closePath();
   ctx.fill();
-
-  // Open space labels
-  ctx.fillStyle = '#4a4';
-  ctx.font = '10px -apple-system, sans-serif';
+  ctx.font = 'bold 12px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('OPEN SPACE / BUFFER', ox + propW / 2, oy + bufPx / 2 + 3);
-  ctx.fillText('BUFFER', ox + bufPx / 2, oy + propH / 2);
+  ctx.fillText('N', naX, naY - 4);
 
-  // ---- Title Block ----
-  const tbY = drawH + 10;
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, tbY, canvas.width, titleH);
+  // ---- Scale bar ----
+  const niceScales = [50, 100, 150, 200, 250, 500, 1000];
+  let scaleBarFt = 100;
+  for (const s of niceScales) { if (s * scale > 40 && s * scale < 200) { scaleBarFt = s; break; } }
+  const scaleBarPx = scaleBarFt * scale;
+  const sbX = ox, sbY2 = oy + propH + 24;
+  ctx.fillStyle = '#333';
   ctx.strokeStyle = '#333';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(10, tbY, canvas.width - 20, titleH - 10);
-
-  // Dividers
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.5;
+  // Bar
+  ctx.fillRect(sbX, sbY2, scaleBarPx / 2, 5);
+  ctx.strokeRect(sbX, sbY2, scaleBarPx, 5);
+  // Ticks
   ctx.beginPath();
-  ctx.moveTo(canvas.width * 0.45, tbY);
-  ctx.lineTo(canvas.width * 0.45, tbY + titleH - 10);
-  ctx.moveTo(canvas.width * 0.75, tbY);
-  ctx.lineTo(canvas.width * 0.75, tbY + titleH - 10);
+  ctx.moveTo(sbX, sbY2 - 2); ctx.lineTo(sbX, sbY2 + 7);
+  ctx.moveTo(sbX + scaleBarPx / 2, sbY2 - 2); ctx.lineTo(sbX + scaleBarPx / 2, sbY2 + 7);
+  ctx.moveTo(sbX + scaleBarPx, sbY2 - 2); ctx.lineTo(sbX + scaleBarPx, sbY2 + 7);
+  ctx.stroke();
+  ctx.font = '9px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('0', sbX, sbY2 + 18);
+  ctx.fillText((scaleBarFt / 2) + '\'', sbX + scaleBarPx / 2, sbY2 + 18);
+  ctx.fillText(scaleBarFt + '\'', sbX + scaleBarPx, sbY2 + 18);
+  ctx.font = '8px -apple-system, sans-serif';
+  ctx.fillText('1" = ' + Math.round(1 / scale * 96) + '\'', sbX + scaleBarPx / 2, sbY2 + 30);
+
+  // ---- TITLE BLOCK ----
+  const tbY = 730;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, tbY, canvas.width, titleH + 20);
+
+  // Outer border
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(12, tbY + 4, canvas.width - 24, titleH);
+
+  // Column dividers
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#555';
+  const col1 = canvas.width * 0.42, col2 = canvas.width * 0.72;
+  ctx.beginPath();
+  ctx.moveTo(col1, tbY + 4); ctx.lineTo(col1, tbY + titleH + 4);
+  ctx.moveTo(col2, tbY + 4); ctx.lineTo(col2, tbY + titleH + 4);
+  // Horizontal line in left column
+  ctx.moveTo(12, tbY + 52); ctx.lineTo(col1, tbY + 52);
   ctx.stroke();
 
-  // Left: project info
+  // Left col — project info
   ctx.fillStyle = '#111';
-  ctx.font = 'bold 16px -apple-system, sans-serif';
+  ctx.font = 'bold 18px -apple-system, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(projectName.toUpperCase(), 24, tbY + 28);
+  ctx.fillText(projectName.toUpperCase(), 24, tbY + 30);
   ctx.font = '11px -apple-system, sans-serif';
-  ctx.fillStyle = '#555';
-  ctx.fillText('PRELIMINARY CONCEPT PLAN', 24, tbY + 46);
-  if (ownerName) ctx.fillText('Developer: ' + ownerName, 24, tbY + 62);
-  ctx.fillText(totalAcres.toFixed(2) + ' Acres — ' + lots.length + ' Lots', 24, tbY + 78);
+  ctx.fillStyle = '#444';
+  ctx.fillText('PRELIMINARY CONCEPT PLAN — NOT FOR CONSTRUCTION', 24, tbY + 46);
+  ctx.fillStyle = '#111';
+  ctx.font = '11px -apple-system, sans-serif';
+  if (ownerName) ctx.fillText('Developer: ' + ownerName, 24, tbY + 70);
+  ctx.fillText('Total Area: ' + totalAcres.toFixed(2) + ' Acres  |  ' + lots.length + ' Lots  |  ' + (lots.length / totalAcres).toFixed(1) + ' lots/ac', 24, tbY + 88);
 
-  // Middle: details
-  const mx = canvas.width * 0.45 + 16;
+  // Middle col — specs
+  const mx = col1 + 16;
   ctx.fillStyle = '#111';
   ctx.font = '10px -apple-system, sans-serif';
-  ctx.fillText('Lot Size: ' + lotWidth + '\' × ' + lotDepth + '\'', mx, tbY + 22);
-  ctx.fillText('Road ROW: ' + roadWidth + '\'', mx, tbY + 36);
-  ctx.fillText('Setbacks: ' + setbackFront + '\' front / ' + setbackSide + '\' side', mx, tbY + 50);
-  ctx.fillText('Buffer: ' + perimBuffer + '\'  |  Pond: ' + (pondPct * 100).toFixed(0) + '%', mx, tbY + 64);
-  ctx.fillText('Layout: ' + layoutStyle.charAt(0).toUpperCase() + layoutStyle.slice(1), mx, tbY + 78);
+  ctx.fillText('Lot Dimensions: ' + lotWidth + '\' × ' + lotDepth + '\' (' + (lotWidth * lotDepth).toLocaleString() + ' SF)', mx, tbY + 24);
+  ctx.fillText('Road ROW: ' + roadWidth + '\'', mx, tbY + 40);
+  ctx.fillText('Setbacks: ' + setbackFront + '\' front  /  ' + setbackSide + '\' side', mx, tbY + 56);
+  ctx.fillText('Perimeter Buffer: ' + perimBuffer + '\'', mx, tbY + 72);
+  ctx.fillText('Stormwater: ' + (pondPct * 100).toFixed(0) + '%  (' + (pondArea / 43560).toFixed(2) + ' ac)', mx, tbY + 88);
 
-  // Right: branding
-  const rx = canvas.width * 0.75 + 16;
-  ctx.fillStyle = '#00a0cc';
-  ctx.font = 'bold 14px -apple-system, sans-serif';
+  // Right col — branding + date
+  const rx = col2 + 16;
+  ctx.fillStyle = '#00809a';
+  ctx.font = 'bold 15px -apple-system, sans-serif';
   ctx.fillText('Land Takeoffs', rx, tbY + 28);
-  ctx.fillStyle = '#888';
+  ctx.fillStyle = '#666';
   ctx.font = '10px -apple-system, sans-serif';
   ctx.fillText('landtakeoffs.com', rx, tbY + 44);
-  ctx.fillText('CONCEPT PLAN — NOT FOR CONSTRUCTION', rx, tbY + 60);
+  ctx.fillText('Site Analysis & Estimation', rx, tbY + 58);
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  ctx.fillText('Date: ' + today, rx, tbY + 76);
+  ctx.fillText('Date: ' + today, rx, tbY + 78);
+  ctx.fillText('Layout: ' + layoutStyle.charAt(0).toUpperCase() + layoutStyle.slice(1), rx, tbY + 92);
 
-  // ---- Scale Bar ----
-  const scaleBarFt = Math.round(100 / scale / 50) * 50 || 50; // round to nice number
-  const scaleBarPx = scaleBarFt * scale;
-  const sbX = ox;
-  const sbY2 = oy + propH + 20;
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(sbX, sbY2); ctx.lineTo(sbX + scaleBarPx, sbY2);
-  ctx.moveTo(sbX, sbY2 - 4); ctx.lineTo(sbX, sbY2 + 4);
-  ctx.moveTo(sbX + scaleBarPx, sbY2 - 4); ctx.lineTo(sbX + scaleBarPx, sbY2 + 4);
-  ctx.stroke();
-  ctx.fillStyle = '#333';
-  ctx.font = '10px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('0', sbX, sbY2 + 14);
-  ctx.fillText(scaleBarFt + ' ft', sbX + scaleBarPx, sbY2 + 14);
-
-  // Update summary
-  const netDevelopable = totalAcres * 0.52;
-  const openSpaceAc = totalAcres * 0.15;
+  // ---- Update summary panel ----
+  const netDev = totalAcres * 0.52;
+  const openAc = totalAcres * 0.15;
   const roadAc = totalAcres * 0.22;
   const pondAc = totalAcres * pondPct;
   const density = lots.length / totalAcres;
 
   document.getElementById('summary').innerHTML = `
-    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
-      <span>Total Lots</span><b style="color:var(--cyan)">${lots.length}</b>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
-      <span>Density</span><b>${density.toFixed(1)} lots/acre</b>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
-      <span>Net Developable</span><b>${netDevelopable.toFixed(1)} ac (52%)</b>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
-      <span>Roads / ROW</span><b>${roadAc.toFixed(1)} ac (22%)</b>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
-      <span>Open Space</span><b>${openSpaceAc.toFixed(1)} ac (15%)</b>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
-      <span>Stormwater</span><b>${pondAc.toFixed(1)} ac (${(pondPct * 100).toFixed(0)}%)</b>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0;">
-      <span>Lot Size</span><b>${lotWidth}' × ${lotDepth}' (${(lotWidth * lotDepth).toLocaleString()} sf)</b>
-    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Total Lots</span><b style="color:var(--cyan)">${lots.length}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Density</span><b>${density.toFixed(1)} lots/ac</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Net Developable</span><b>${netDev.toFixed(1)} ac (52%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Roads / ROW</span><b>${roadAc.toFixed(1)} ac (22%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Open Space</span><b>${openAc.toFixed(1)} ac (15%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Stormwater</span><b>${pondAc.toFixed(1)} ac (${(pondPct * 100).toFixed(0)}%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Lot Size</span><b>${lotWidth}' × ${lotDepth}' (${(lotWidth * lotDepth).toLocaleString()} sf)</b></div>
   `;
+}
+
+// ---- Drawing helpers ----
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function drawDimension(x1, y1, x2, y2, label) {
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+  ctx.moveTo(x1, y1 - 4); ctx.lineTo(x1, y1 + 4);
+  ctx.moveTo(x2, y2 - 4); ctx.lineTo(x2, y2 + 4);
+  ctx.stroke();
+  ctx.fillStyle = '#333';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, (x1 + x2) / 2, y1 - 4);
 }
 
 function downloadPDF() {
