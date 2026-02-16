@@ -54,8 +54,8 @@ class Config:
 
     # --- API Keys (from environment) ---
     REGRID_API_KEY: str = os.getenv("REGRID_API_KEY", "")
-    OPENTOPO_API_KEY: str = os.getenv("OPENTOPO_API_KEY", "")
-    OPENTOPOGRAPHY_API_KEY: str = os.getenv("OPENTOPO_API_KEY", "")
+    OPENTOPO_API_KEY: str = os.getenv("OPENTOPOGRAPHY_API_KEY", os.getenv("OPENTOPO_API_KEY", ""))
+    OPENTOPOGRAPHY_API_KEY: str = os.getenv("OPENTOPOGRAPHY_API_KEY", os.getenv("OPENTOPO_API_KEY", ""))
 
     # --- API Endpoints ---
     REGRID_BASE_URL: str = "https://api.regrid.com/v2"
