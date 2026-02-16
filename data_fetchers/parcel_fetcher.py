@@ -3,7 +3,10 @@
 import logging
 from typing import Optional
 
-import geopandas as gpd
+try:
+    import geopandas as gpd
+except ImportError:
+    gpd = None
 import requests
 from shapely.geometry import shape
 
