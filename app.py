@@ -5,13 +5,25 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import config
-try:
-    from data_fetchers.parcel_fetcher import ParcelFetcher
-except ImportError:
-    ParcelFetcher = None
-from data_fetchers.elevation_fetcher import ElevationFetcher
 from data_fetchers.gcgis_fetcher import search_parcels, get_parcel_by_pin, geocode_address
-from analysis.terrain_analysis import TerrainAnalyzer
+
+# Lazy imports for heavy modules (scipy, numpy) — only loaded when needed
+ParcelFetcher = None
+ElevationFetcher = None
+TerrainAnalyzer = None
+
+def _load_heavy_modules():
+    global ParcelFetcher, ElevationFetcher, TerrainAnalyzer
+    if TerrainAnalyzer is None:
+        try:
+            from data_fetchers.parcel_fetcher import ParcelFetcher as _PF
+            ParcelFetcher = _PF
+        except ImportError:
+            pass
+        from data_fetchers.elevation_fetcher import ElevationFetcher as _EF
+        from analysis.terrain_analysis import TerrainAnalyzer as _TA
+        ElevationFetcher = _EF
+        TerrainAnalyzer = _TA
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +46,7 @@ def health():
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
+    _load_heavy_modules()
     """Run the full analysis pipeline for a parcel.
 
     Expects JSON body::
@@ -107,6 +120,7 @@ def analyze():
 
 @app.route("/api/analyze-coords", methods=["POST"])
 def analyze_coords():
+    _load_heavy_modules()
     """Analyze terrain for a bounding box (no parcel lookup needed).
 
     Expects JSON body::
