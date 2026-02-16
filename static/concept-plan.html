@@ -215,12 +215,18 @@ function generatePlan() {
         
         actualParcelBounds = {
           coordinates: coords,
-          bounds: { minX, minY, maxX, maxY },
+          bounds: { 
+            minX, minY, maxX, maxY,
+            width: maxX - minX,
+            height: maxY - minY
+          },
           widthFt: widthFt,
           heightFt: heightFt
         };
         
         console.log(`Using real parcel: ${widthFt.toFixed(0)}' x ${heightFt.toFixed(0)}'`);
+        console.log('Parcel coordinates:', coords);
+        console.log('Bounds:', actualParcelBounds.bounds);
       }
     } catch (e) {
       console.log('Invalid geometry parameter, using default rectangle');
@@ -650,6 +656,7 @@ function generatePlan() {
   
   if (actualParcelBounds) {
     // Draw actual parcel shape
+    console.log('Drawing actual parcel boundary with', actualParcelBounds.coordinates.length, 'points');
     ctx.beginPath();
     const coords = actualParcelBounds.coordinates;
     
@@ -663,6 +670,7 @@ function generatePlan() {
       const py = oy + (1 - pctY) * propH; // flip Y axis
       
       if (i === 0) {
+        console.log(`First point: [${lon}, ${lat}] -> (${px.toFixed(1)}, ${py.toFixed(1)})`);
         ctx.moveTo(px, py);
       } else {
         ctx.lineTo(px, py);
