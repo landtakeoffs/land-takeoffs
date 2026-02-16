@@ -147,7 +147,22 @@ class ElevationFetcher:
         # Read pixel data
         raw = b''
         for off, bc in zip(offsets, byte_counts):
-            raw += data[off:off + bc]
+            if off < len(data) and bc > 0:
+                raw += data[off:off + bc]
+            else:
+                logger.error(f"Invalid strip: offset={off}, bytes={bc}, data_len={len(data)}")
+
+        # Check if we got data
+        if len(raw) == 0:
+            logger.error(f"No pixel data extracted from TIFF. Tags: {list(tags.keys())}")
+            raise RuntimeError("Failed to extract pixel data from GeoTIFF - empty strips")
+        
+        expected_size = width * height * (bits // 8)
+        if len(raw) != expected_size:
+            logger.error(f"Pixel data size mismatch: got {len(raw)} bytes, expected {expected_size}")
+            # Try to use what we have
+            if len(raw) < expected_size:
+                raise RuntimeError(f"Insufficient pixel data: {len(raw)} < {expected_size} bytes")
 
         # Convert to numpy
         if bits == 16 and sample_format == 2:
