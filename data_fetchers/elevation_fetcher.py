@@ -133,16 +133,54 @@ class ElevationFetcher:
         so_dtype, so_count, so_val = tags.get(273, (4, 1, 0))
         if so_count == 1:
             offsets = [so_val]
-        else:
+        elif so_count > 1:
             fmt = f'{bo}{so_count}I' if so_dtype == 4 else f'{bo}{so_count}H'
-            offsets = list(struct.unpack_from(fmt, data, so_val))
+            try:
+                offsets = list(struct.unpack_from(fmt, data, so_val))
+            except struct.error as e:
+                logger.error(f"Failed to unpack strip offsets: {e}, count={so_count}, val={so_val}")
+                offsets = []
+        else:
+            offsets = []
 
         sbc_dtype, sbc_count, sbc_val = tags.get(279, (4, 1, 0))
         if sbc_count == 1:
             byte_counts = [sbc_val]
-        else:
+        elif sbc_count > 1:
             fmt = f'{bo}{sbc_count}I' if sbc_dtype == 4 else f'{bo}{sbc_count}H'
-            byte_counts = list(struct.unpack_from(fmt, data, sbc_val))
+            try:
+                byte_counts = list(struct.unpack_from(fmt, data, sbc_val))
+            except struct.error as e:
+                logger.error(f"Failed to unpack byte counts: {e}, count={sbc_count}, val={sbc_val}")
+                byte_counts = []
+        else:
+            byte_counts = []
+        
+        if not offsets or not byte_counts:
+            # Try tiled format (tags 324, 325 for tile offsets/byte counts)
+            tile_offsets = tags.get(324, None)
+            tile_byte_counts = tags.get(325, None)
+            
+            if tile_offsets and tile_byte_counts:
+                logger.info("TIFF uses tiles instead of strips")
+                to_dtype, to_count, to_val = tile_offsets
+                tbc_dtype, tbc_count, tbc_val = tile_byte_counts
+                
+                if to_count == 1:
+                    offsets = [to_val]
+                else:
+                    fmt = f'{bo}{to_count}I' if to_dtype == 4 else f'{bo}{to_count}H'
+                    offsets = list(struct.unpack_from(fmt, data, to_val))
+                
+                if tbc_count == 1:
+                    byte_counts = [tbc_val]
+                else:
+                    fmt = f'{bo}{tbc_count}I' if tbc_dtype == 4 else f'{bo}{tbc_count}H'
+                    byte_counts = list(struct.unpack_from(fmt, data, tbc_val))
+            else:
+                logger.error(f"Missing strip/tile info: offsets={len(offsets)}, byte_counts={len(byte_counts)}")
+                logger.error(f"TIFF tags: {[(k, v) for k, v in tags.items() if k in [273, 279, 324, 325, 256, 257]]}")
+                raise RuntimeError("Cannot find strip offsets/byte counts or tile offsets/byte counts in TIFF")
 
         # Read pixel data
         raw = b''
