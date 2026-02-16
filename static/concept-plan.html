@@ -143,8 +143,15 @@ const ctx = canvas.getContext('2d');
 // Read URL params (from map page)
 const params = new URLSearchParams(window.location.search);
 if (params.get('acres')) document.getElementById('totalAcres').value = params.get('acres');
+if (params.get('acreage')) document.getElementById('totalAcres').value = params.get('acreage');
 if (params.get('subdiv')) document.getElementById('projectName').value = params.get('subdiv');
+if (params.get('subdivision')) document.getElementById('projectName').value = params.get('subdivision');
 if (params.get('owner')) document.getElementById('ownerName').value = params.get('owner');
+
+// Check if we have real parcel geometry
+if (params.get('geometry')) {
+  console.log('Real parcel geometry detected - will use actual parcel boundaries');
+}
 
 /* =============================================
    COLLISION GRID — prevents any overlap
@@ -179,10 +186,58 @@ function generatePlan() {
   // Drawing area
   const drawW = 1060, drawH = 720, titleH = 100, margin = 40;
 
-  // Property proportions — slightly rectangular
-  const aspect = 1.35;
-  const propW_ft = Math.sqrt(totalSqFt * aspect);
-  const propH_ft = totalSqFt / propW_ft;
+  // Check if we have real parcel geometry from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const parcelGeometry = urlParams.get('geometry');
+  let actualParcelBounds = null;
+  
+  if (parcelGeometry) {
+    try {
+      const geom = JSON.parse(decodeURIComponent(parcelGeometry));
+      if (geom.coordinates && geom.coordinates[0]) {
+        // Calculate bounding box from polygon coordinates
+        const coords = geom.coordinates[0];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        
+        coords.forEach(([x, y]) => {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        });
+        
+        // Convert lat/lon degrees to approximate feet (rough conversion for SC)
+        const latToFeet = 364000; // feet per degree latitude
+        const lonToFeet = 288200; // feet per degree longitude (at SC latitude ~34°)
+        
+        const widthFt = (maxX - minX) * lonToFeet;
+        const heightFt = (maxY - minY) * latToFeet;
+        
+        actualParcelBounds = {
+          coordinates: coords,
+          bounds: { minX, minY, maxX, maxY },
+          widthFt: widthFt,
+          heightFt: heightFt
+        };
+        
+        console.log(`Using real parcel: ${widthFt.toFixed(0)}' x ${heightFt.toFixed(0)}'`);
+      }
+    } catch (e) {
+      console.log('Invalid geometry parameter, using default rectangle');
+    }
+  }
+
+  // Property dimensions 
+  let propW_ft, propH_ft;
+  if (actualParcelBounds) {
+    propW_ft = actualParcelBounds.widthFt;
+    propH_ft = actualParcelBounds.heightFt;
+  } else {
+    // Default: slightly rectangular proportions
+    const aspect = 1.35;
+    propW_ft = Math.sqrt(totalSqFt * aspect);
+    propH_ft = totalSqFt / propW_ft;
+  }
 
   // Scale to fit with margin
   const scale = Math.min((drawW - margin * 2) / propW_ft, (drawH - margin * 2) / propH_ft);
@@ -589,9 +644,42 @@ function generatePlan() {
   ctx.fillText((pondArea / 43560).toFixed(2) + ' ac', pondCx, pondCy + 21);
 
   // ---- Property boundary ----
+  // Draw property boundary
   ctx.strokeStyle = '#222';
   ctx.lineWidth = 3;
-  ctx.strokeRect(ox, oy, propW, propH);
+  
+  if (actualParcelBounds) {
+    // Draw actual parcel shape
+    ctx.beginPath();
+    const coords = actualParcelBounds.coordinates;
+    
+    for (let i = 0; i < coords.length; i++) {
+      const [lon, lat] = coords[i];
+      
+      // Convert lat/lon to canvas pixels
+      const pctX = (lon - actualParcelBounds.bounds.minX) / actualParcelBounds.bounds.width;
+      const pctY = (lat - actualParcelBounds.bounds.minY) / actualParcelBounds.bounds.height;
+      const px = ox + pctX * propW;  
+      const py = oy + (1 - pctY) * propH; // flip Y axis
+      
+      if (i === 0) {
+        ctx.moveTo(px, py);
+      } else {
+        ctx.lineTo(px, py);
+      }
+    }
+    ctx.closePath();
+    ctx.stroke();
+    
+    // Add label
+    ctx.fillStyle = '#2c5aa0';
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ACTUAL PARCEL BOUNDARY', ox + propW/2, oy - 8);
+  } else {
+    // Draw default rectangle
+    ctx.strokeRect(ox, oy, propW, propH);
+  }
 
   // Buffer line
   ctx.strokeStyle = '#5a5';

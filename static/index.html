@@ -713,6 +713,17 @@ function selectParcelOnMap(p, poly) {
   document.getElementById('north').value = b.getNorth().toFixed(5);
   document.getElementById('west').value = b.getWest().toFixed(5);
   document.getElementById('east').value = b.getEast().toFixed(5);
+  
+  // Update concept plan link with parcel geometry
+  const conceptLink = document.querySelector('a[href="/concept-plan"]');
+  if (conceptLink && p._geometry) {
+    const acreage = p.GIS_ACRES || 5.0;
+    const subdivName = p.SUBDIV || 'Selected Parcel';
+    const geomParam = encodeURIComponent(JSON.stringify(p._geometry));
+    const newUrl = `/concept-plan?acreage=${acreage}&subdivision=${encodeURIComponent(subdivName)}&geometry=${geomParam}`;
+    conceptLink.href = newUrl;
+    console.log('Updated concept plan link with real parcel geometry');
+  }
 }
 
 function analyzeParcel(pin) {
