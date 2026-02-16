@@ -51,6 +51,11 @@ def debug_check():
         issues.append(f"heavy modules OK: EF={ElevationFetcher}, TA={TerrainAnalyzer}")
     except Exception as e:
         issues.append(f"heavy modules FAIL: {e}")
+    
+    # Check API keys
+    issues.append(f"OPENTOPO_API_KEY: {'SET' if config.OPENTOPO_API_KEY else 'MISSING'}")
+    issues.append(f"OPENTOPOGRAPHY_API_KEY: {'SET' if config.OPENTOPOGRAPHY_API_KEY else 'MISSING'}")
+    
     return jsonify({"checks": issues})
 
 
