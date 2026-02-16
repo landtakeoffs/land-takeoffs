@@ -188,10 +188,11 @@ function generatePlan() {
 
   // Pixel conversions
   const bufPx = perimBuffer * scale;
-  const roadPx = roadWidth * scale;
+  const roadPx = Math.max(roadWidth * scale, 6); // min 6px visible
+  const roadDraw = Math.min(roadPx, 18); // cap visual road width so it doesn't dominate
   const lotWPx = lotWidth * scale;
   const lotDPx = lotDepth * scale;
-  const gap = 2; // pixel gap between lots (thin lot line)
+  const gap = 1; // pixel gap between lots
 
   // Developable area (inside buffer)
   const devX = ox + bufPx;
@@ -202,14 +203,15 @@ function generatePlan() {
   // Collision grid
   const grid = new CollisionGrid(canvas.width, canvas.height);
 
-  // Pond placement — bottom-right of developable area
+  // Pond placement — bottom-right, sized proportionally but capped
   const pondArea = totalSqFt * pondPct;
-  const pondRx = Math.sqrt(pondArea) * scale * 0.75;
-  const pondRy = pondRx * 0.55;
-  const pondCx = devX + devW - pondRx - 15;
-  const pondCy = devY + devH - pondRy - 15;
-  // Reserve pond as rectangular bounding box in collision grid
-  grid.add(pondCx - pondRx - 10, pondCy - pondRy - 10, pondRx * 2 + 20, pondRy * 2 + 20, 'pond');
+  const pondMaxR = Math.min(devW * 0.18, devH * 0.22);
+  const pondRx = Math.min(Math.sqrt(pondArea) * scale * 0.5, pondMaxR);
+  const pondRy = pondRx * 0.6;
+  const pondCx = devX + devW - pondRx - 8;
+  const pondCy = devY + devH - pondRy - 8;
+  // Reserve pond in collision grid
+  grid.add(pondCx - pondRx - 5, pondCy - pondRy - 5, pondRx * 2 + 10, pondRy * 2 + 10, 'pond');
 
   // ---- ROAD LAYOUT ----
   let roads = [];
@@ -217,141 +219,149 @@ function generatePlan() {
   let lots = [];
 
   if (layoutStyle === 'grid') {
-    // Collector road — horizontal, roughly 40% from top
+    const rd = roadDraw; // visual road width
+    // Collector road — horizontal, roughly 42% from top
     const mainY = devY + devH * 0.42;
-    roads.push({ x: devX, y: mainY, w: devW, h: roadPx, label: projectName.toUpperCase() + ' DR', type: 'main' });
-    grid.add(devX, mainY, devW, roadPx, 'road');
+    roads.push({ x: devX, y: mainY, w: devW, h: rd, label: projectName.toUpperCase() + ' DR', type: 'main' });
+    grid.add(devX, mainY, devW, rd, 'road');
 
     // Entry stub from property line
-    roads.push({ x: ox, y: mainY, w: bufPx, h: roadPx, type: 'entry' });
+    roads.push({ x: ox, y: mainY, w: bufPx, h: rd, type: 'entry' });
 
-    // Calculate side streets — evenly spaced, each side street has lots on both sides
-    const blockWidth = lotWPx * 2 + gap * 2 + roadPx; // two lots wide + road
-    const availW = devW - roadPx; // minus end margins
-    let numBlocks = Math.max(1, Math.floor(availW / (blockWidth + lotWPx)));
+    // Calculate side streets — space for lotDepth on each side + road
+    const blockWidth = lotDPx * 2 + gap * 2 + rd;
+    let numBlocks = Math.max(1, Math.floor(devW / (blockWidth + lotWPx * 0.5)));
     const streetSpacing = devW / (numBlocks + 1);
 
     for (let i = 0; i < numBlocks; i++) {
-      const sx = devX + streetSpacing * (i + 1) - roadPx / 2;
-      // Street above main road
+      const sx = devX + streetSpacing * (i + 1) - rd / 2;
       const topLen = mainY - devY;
-      if (topLen > roadPx * 2) {
-        roads.push({ x: sx, y: devY, w: roadPx, h: topLen, label: 'ST ' + String.fromCharCode(65 + i), type: 'side' });
-        grid.add(sx, devY, roadPx, topLen, 'road');
+      if (topLen > rd * 2) {
+        roads.push({ x: sx, y: devY, w: rd, h: topLen, label: 'ST ' + String.fromCharCode(65 + i), type: 'side' });
+        grid.add(sx, devY, rd, topLen, 'road');
       }
-      // Street below main road
-      const botStart = mainY + roadPx;
+      const botStart = mainY + rd;
       const botLen = devY + devH - botStart;
-      if (botLen > roadPx * 2) {
-        roads.push({ x: sx, y: botStart, w: roadPx, h: botLen, type: 'side' });
-        grid.add(sx, botStart, roadPx, botLen, 'road');
+      if (botLen > rd * 2) {
+        roads.push({ x: sx, y: botStart, w: rd, h: botLen, type: 'side' });
+        grid.add(sx, botStart, rd, botLen, 'road');
       }
     }
 
     // ---- PLACE LOTS ----
-    // Strategy: walk each road segment and place lots on both sides
     for (const road of roads) {
       if (road.type === 'entry') continue;
 
-      if (road.h === roadPx) {
-        // HORIZONTAL road → lots above and below
+      if (road.w > road.h) {
+        // HORIZONTAL road → lots above and below (width along road, depth away)
         placeLotRow(road.x, road.y - lotDPx - gap, road.w, lotWPx, lotDPx, gap, 'above');
-        placeLotRow(road.x, road.y + roadPx + gap, road.w, lotWPx, lotDPx, gap, 'below');
+        placeLotRow(road.x, road.y + road.h + gap, road.w, lotWPx, lotDPx, gap, 'below');
       } else {
-        // VERTICAL road → lots left and right
-        placeLotCol(road.x - lotWPx - gap, road.y, road.h, lotWPx, lotDPx, gap, 'left');
-        placeLotCol(road.x + roadPx + gap, road.y, road.h, lotWPx, lotDPx, gap, 'right');
+        // VERTICAL road → lots left and right (rotated: depth perpendicular, width along road)
+        placeLotCol(road.x - lotDPx - gap, road.y, road.h, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(road.x + road.w + gap, road.y, road.h, lotWPx, lotDPx, gap, 'right');
       }
     }
 
   } else if (layoutStyle === 'loop') {
-    // Loop road with lots inside and outside
-    const loopPad = lotDPx + gap + 20;
+    // Loop road — use roadDraw for visual width, roadPx for collision
+    const roadHalf = roadDraw / 2;
+    const loopPad = lotDPx + roadDraw + gap + 5;
     const loopX = devX + loopPad;
     const loopY = devY + loopPad;
     const loopW = devW - loopPad * 2;
     const loopH = devH - loopPad * 2;
-    const cornerR = Math.min(roadPx * 4, loopW * 0.12, loopH * 0.12);
+    const cornerR = Math.min(roadDraw * 3, loopW * 0.1, loopH * 0.1);
 
-    // Add loop road segments to collision grid (top, right, bottom, left)
-    grid.add(loopX, loopY - roadPx / 2, loopW, roadPx, 'road');
-    grid.add(loopX + loopW - roadPx / 2, loopY, roadPx, loopH, 'road');
-    grid.add(loopX, loopY + loopH - roadPx / 2, loopW, roadPx, 'road');
-    grid.add(loopX - roadPx / 2, loopY, roadPx, loopH, 'road');
+    // Collision zones for loop road (thin strips)
+    const rw = roadDraw;
+    grid.add(loopX - rw / 2, loopY - rw / 2, loopW + rw, rw, 'road'); // top
+    grid.add(loopX - rw / 2, loopY + loopH - rw / 2, loopW + rw, rw, 'road'); // bottom
+    grid.add(loopX - rw / 2, loopY - rw / 2, rw, loopH + rw, 'road'); // left
+    grid.add(loopX + loopW - rw / 2, loopY - rw / 2, rw, loopH + rw, 'road'); // right
 
-    // Entry road
-    roads.push({ x: ox, y: loopY + loopH / 2 - roadPx / 2, w: loopX - ox + roadPx, h: roadPx, type: 'entry' });
+    // Entry road from left property line
+    const entryY = loopY + loopH / 2 - roadDraw / 2;
+    roads.push({ x: ox, y: entryY, w: loopX - ox + rw, h: roadDraw, type: 'entry' });
 
-    roads.push({ type: 'loop', x: loopX, y: loopY, w: loopW, h: loopH, r: cornerR, roadPx, label: projectName.toUpperCase() + ' LOOP' });
+    roads.push({ type: 'loop', x: loopX, y: loopY, w: loopW, h: loopH, r: cornerR, roadPx: roadDraw, label: projectName.toUpperCase() + ' LOOP' });
 
-    // Lots outside loop — top
-    placeLotRow(loopX + cornerR, loopY - roadPx / 2 - gap - lotDPx, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'above');
-    // Outside — bottom
-    placeLotRow(loopX + cornerR, loopY + loopH + roadPx / 2 + gap, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'below');
-    // Outside — left
-    placeLotCol(loopX - roadPx / 2 - gap - lotWPx, loopY + cornerR, loopH - cornerR * 2, lotWPx, lotDPx, gap, 'left');
-    // Outside — right
-    placeLotCol(loopX + loopW + roadPx / 2 + gap, loopY + cornerR, loopH - cornerR * 2, lotWPx, lotDPx, gap, 'right');
+    // Outside lots — proper rectangles facing the road
+    // Top: lots with depth going UP from road
+    const topLotY = loopY - rw / 2 - gap - lotDPx;
+    placeLotRow(loopX + cornerR, topLotY, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'above');
+    // Bottom
+    const botLotY = loopY + loopH + rw / 2 + gap;
+    placeLotRow(loopX + cornerR, botLotY, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'below');
+    // Left side: lots rotated — width (short side) along road, depth going LEFT
+    const leftLotX = loopX - rw / 2 - gap - lotDPx;
+    placeLotColProper(leftLotX, loopY + cornerR, loopH - cornerR * 2, lotDPx, lotWPx, gap);
+    // Right side
+    const rightLotX = loopX + loopW + rw / 2 + gap;
+    placeLotColProper(rightLotX, loopY + cornerR, loopH - cornerR * 2, lotDPx, lotWPx, gap);
 
-    // Inside loop — rows of lots
-    const insideX = loopX + roadPx / 2 + gap;
-    const insideY = loopY + roadPx / 2 + gap;
-    const insideW = loopW - roadPx - gap * 2;
-    const insideH = loopH - roadPx - gap * 2;
-    // Fill inside with horizontal rows
-    for (let y = insideY; y + lotDPx < insideY + insideH; y += lotDPx + gap) {
-      for (let x = insideX; x + lotWPx < insideX + insideW; x += lotWPx + gap) {
-        if (grid.fits(x, y, lotWPx, lotDPx, 1)) {
-          lots.push({ x, y, w: lotWPx, h: lotDPx, num: lotNumber++ });
-          grid.add(x, y, lotWPx, lotDPx, 'lot');
-        }
-      }
+    // Inside loop — add a center street and lots on both sides
+    const insideX = loopX + rw / 2 + gap;
+    const insideY = loopY + rw / 2 + gap;
+    const insideW = loopW - rw - gap * 2;
+    const insideH = loopH - rw - gap * 2;
+
+    // Horizontal center street inside the loop
+    const innerRoadY = insideY + insideH / 2 - roadDraw / 2;
+    roads.push({ x: insideX, y: innerRoadY, w: insideW, h: roadDraw, type: 'inner', label: 'INNER ST' });
+    grid.add(insideX, innerRoadY, insideW, roadDraw, 'road');
+
+    // Lots above inner street
+    const innerTopY = innerRoadY - gap - lotDPx;
+    if (innerTopY > insideY) {
+      placeLotRow(insideX, innerTopY, insideW, lotWPx, lotDPx, gap, 'above');
+    }
+    // Lots below inner street
+    const innerBotY = innerRoadY + roadDraw + gap;
+    if (innerBotY + lotDPx < insideY + insideH) {
+      placeLotRow(insideX, innerBotY, insideW, lotWPx, lotDPx, gap, 'below');
     }
 
   } else if (layoutStyle === 'cul-de-sac') {
-    // Main road with cul-de-sac branches
-    const mainY = devY + devH * 0.5 - roadPx / 2;
-    roads.push({ x: devX, y: mainY, w: devW, h: roadPx, label: projectName.toUpperCase() + ' DR', type: 'main' });
-    grid.add(devX, mainY, devW, roadPx, 'road');
-    roads.push({ x: ox, y: mainY, w: bufPx, h: roadPx, type: 'entry' });
+    const rd = roadDraw;
+    const mainY = devY + devH * 0.5 - rd / 2;
+    roads.push({ x: devX, y: mainY, w: devW, h: rd, label: projectName.toUpperCase() + ' DR', type: 'main' });
+    grid.add(devX, mainY, devW, rd, 'road');
+    roads.push({ x: ox, y: mainY, w: bufPx, h: rd, type: 'entry' });
 
-    // Cul-de-sac branches going up and down
-    const bulbR = roadPx * 2;
-    const branchLen = (devH - roadPx) / 2 - bulbR - 20;
-    const numBranches = Math.max(1, Math.floor(devW / (lotWPx * 3 + roadPx * 2)));
+    const bulbR = rd * 1.8;
+    const branchLen = (devH - rd) / 2 - bulbR - 15;
+    const numBranches = Math.max(1, Math.floor(devW / (lotDPx * 2 + rd * 3)));
     const branchSpacing = devW / (numBranches + 1);
 
     for (let i = 0; i < numBranches; i++) {
-      const bx = devX + branchSpacing * (i + 1) - roadPx / 2;
+      const bx = devX + branchSpacing * (i + 1) - rd / 2;
 
-      // Branch up
-      if (branchLen > lotDPx) {
+      if (branchLen > lotWPx) {
         const topY = mainY - branchLen;
-        roads.push({ x: bx, y: topY + bulbR, w: roadPx, h: branchLen - bulbR, type: 'side' });
-        grid.add(bx, topY + bulbR, roadPx, branchLen - bulbR, 'road');
-        roads.push({ type: 'bulb', cx: bx + roadPx / 2, cy: topY + bulbR, r: bulbR });
-        grid.add(bx - bulbR, topY, bulbR * 2 + roadPx, bulbR * 2, 'road');
+        roads.push({ x: bx, y: topY + bulbR, w: rd, h: branchLen - bulbR, type: 'side' });
+        grid.add(bx, topY + bulbR, rd, branchLen - bulbR, 'road');
+        roads.push({ type: 'bulb', cx: bx + rd / 2, cy: topY + bulbR, r: bulbR });
+        grid.add(bx - bulbR, topY, bulbR * 2 + rd, bulbR * 2, 'road');
 
-        placeLotCol(bx - lotWPx - gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
-        placeLotCol(bx + roadPx + gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+        placeLotCol(bx - lotDPx - gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + rd + gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
       }
 
-      // Branch down
-      if (branchLen > lotDPx) {
-        const botStart = mainY + roadPx;
-        roads.push({ x: bx, y: botStart, w: roadPx, h: branchLen - bulbR, type: 'side' });
-        grid.add(bx, botStart, roadPx, branchLen - bulbR, 'road');
-        roads.push({ type: 'bulb', cx: bx + roadPx / 2, cy: botStart + branchLen - bulbR, r: bulbR });
-        grid.add(bx - bulbR, botStart + branchLen - bulbR * 2, bulbR * 2 + roadPx, bulbR * 2, 'road');
+      if (branchLen > lotWPx) {
+        const botStart = mainY + rd;
+        roads.push({ x: bx, y: botStart, w: rd, h: branchLen - bulbR, type: 'side' });
+        grid.add(bx, botStart, rd, branchLen - bulbR, 'road');
+        roads.push({ type: 'bulb', cx: bx + rd / 2, cy: botStart + branchLen - bulbR, r: bulbR });
+        grid.add(bx - bulbR, botStart + branchLen - bulbR * 2, bulbR * 2 + rd, bulbR * 2, 'road');
 
-        placeLotCol(bx - lotWPx - gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
-        placeLotCol(bx + roadPx + gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+        placeLotCol(bx - lotDPx - gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + rd + gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
       }
     }
 
-    // Lots along main road (between branches)
     placeLotRow(devX, mainY - lotDPx - gap, devW, lotWPx, lotDPx, gap, 'above');
-    placeLotRow(devX, mainY + roadPx + gap, devW, lotWPx, lotDPx, gap, 'below');
+    placeLotRow(devX, mainY + rd + gap, devW, lotWPx, lotDPx, gap, 'below');
   }
 
   // ---- Lot placement helpers (use collision grid) ----
@@ -368,16 +378,27 @@ function generatePlan() {
   }
 
   function placeLotCol(x, startY, length, lw, lh, g, side) {
-    if (x < oy || x + lw > devX + devW) return;
-    // For vertical placement, lots are rotated: width along road, depth perpendicular
-    const lotW = lw;
-    const lotH = lw; // square-ish lots along side streets — use lotWidth for both
+    // Vertical road: lots rotated — lotWidth along road (height), lotDepth perpendicular (width)
+    const lotW = lotDPx; // depth goes perpendicular to road
+    const lotH = lotWPx; // width goes along road
     for (let y = startY + g; y + lotH <= startY + length - g; y += lotH + g) {
       if (y < devY || y + lotH > devY + devH) continue;
-      if (x < devX) continue;
+      if (x < devX || x + lotW > devX + devW) continue;
       if (grid.fits(x, y, lotW, lotH, 1)) {
         lots.push({ x, y, w: lotW, h: lotH, num: lotNumber++ });
         grid.add(x, y, lotW, lotH, 'lot');
+      }
+    }
+  }
+
+  // For loop sides — explicit w/h control
+  function placeLotColProper(x, startY, length, w, h, g) {
+    for (let y = startY + g; y + h <= startY + length - g; y += h + g) {
+      if (y < devY || y + h > devY + devH) continue;
+      if (x < devX || x + w > devX + devW) continue;
+      if (grid.fits(x, y, w, h, 1)) {
+        lots.push({ x, y, w, h, num: lotNumber++ });
+        grid.add(x, y, w, h, 'lot');
       }
     }
   }
@@ -397,12 +418,10 @@ function generatePlan() {
   ctx.fillRect(devX, devY, devW, devH);
 
   // ---- Draw roads ----
-  ctx.fillStyle = '#d0d0d0';
-  ctx.strokeStyle = '#aaa';
-  ctx.lineWidth = 0.5;
   for (const r of roads) {
     if (r.type === 'loop') {
-      // Draw rounded loop
+      // Draw rounded loop — two parallel lines (road edges) + fill
+      ctx.fillStyle = '#e0e0e0';
       ctx.strokeStyle = '#999';
       ctx.lineWidth = r.roadPx;
       ctx.lineCap = 'round';
@@ -420,7 +439,6 @@ function generatePlan() {
       ctx.arcTo(r.x, r.y, r.x + cr, r.y, cr);
       ctx.closePath();
       ctx.stroke();
-      ctx.lineWidth = 0.5;
     } else if (r.type === 'bulb') {
       // Cul-de-sac bulb
       ctx.fillStyle = '#d0d0d0';
@@ -502,13 +520,13 @@ function generatePlan() {
 
   // ---- Retention pond ----
   // Outer glow
-  const pgrd = ctx.createRadialGradient(pondCx, pondCy, 0, pondCx, pondCy, Math.max(pondRx, pondRy) * 1.2);
+  const pgrd = ctx.createRadialGradient(pondCx, pondCy, 0, pondCx, pondCy, Math.max(pondRx, pondRy) * 1.15);
   pgrd.addColorStop(0, '#b8ddf0');
   pgrd.addColorStop(0.7, '#cce8f5');
   pgrd.addColorStop(1, '#e8f5e8');
   ctx.fillStyle = pgrd;
   ctx.beginPath();
-  ctx.ellipse(pondCx, pondCy, pondRx + 8, pondRy + 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(pondCx, pondCy, pondRx + 4, pondRy + 4, 0, 0, Math.PI * 2);
   ctx.fill();
   // Pond body
   ctx.fillStyle = '#b5d8eb';
