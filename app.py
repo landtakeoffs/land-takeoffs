@@ -5,7 +5,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import config
-from data_fetchers.parcel_fetcher import ParcelFetcher
+try:
+    from data_fetchers.parcel_fetcher import ParcelFetcher
+except ImportError:
+    ParcelFetcher = None
 from data_fetchers.elevation_fetcher import ElevationFetcher
 from data_fetchers.gcgis_fetcher import search_parcels, get_parcel_by_pin, geocode_address
 from analysis.terrain_analysis import TerrainAnalyzer
