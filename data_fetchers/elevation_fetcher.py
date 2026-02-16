@@ -19,6 +19,13 @@ except ImportError:
     HAS_RASTERIO = False
 
 try:
+    from PIL import Image
+    import io
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
+
+try:
     import requests
 except ImportError:
     requests = None
@@ -83,6 +90,8 @@ class ElevationFetcher:
 
         if HAS_RASTERIO:
             return self._parse_with_rasterio(response.content)
+        elif HAS_PILLOW:
+            return self._parse_with_pillow(response.content, west, south, east, north)
         else:
             return self._parse_geotiff_minimal(response.content, west, south, east, north)
 
@@ -94,6 +103,35 @@ class ElevationFetcher:
                 profile = dict(dataset.profile)
         logger.info("DEM fetched (rasterio): shape=%s", elevation.shape)
         return elevation, profile
+
+    def _parse_with_pillow(self, data: bytes, west, south, east, north) -> Tuple[np.ndarray, dict]:
+        """Parse GeoTIFF using Pillow."""
+        try:
+            img = Image.open(io.BytesIO(data))
+            elevation = np.array(img).astype(np.float64)
+            
+            # Handle different image modes
+            if elevation.ndim == 3:
+                elevation = elevation[:, :, 0]  # Take first band
+            
+            height, width = elevation.shape
+            
+            # Build profile with transform info
+            x_res = (east - west) / width
+            y_res = (north - south) / height
+            profile = {
+                "width": width,
+                "height": height,
+                "transform": [x_res, 0, west, 0, -y_res, north],
+            }
+            
+            logger.info("DEM fetched (Pillow): shape=%s, min=%.1f, max=%.1f, dtype=%s",
+                       elevation.shape, float(np.nanmin(elevation)), float(np.nanmax(elevation)), elevation.dtype)
+            return elevation, profile
+            
+        except Exception as e:
+            logger.error(f"Pillow TIFF parsing failed: {e}")
+            raise RuntimeError(f"Failed to parse GeoTIFF with Pillow: {e}")
 
     def _parse_geotiff_minimal(self, data: bytes, west, south, east, north) -> Tuple[np.ndarray, dict]:
         """Parse GeoTIFF without rasterio — basic TIFF parser for single-band DEMs."""

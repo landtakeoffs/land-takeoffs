@@ -56,10 +56,11 @@ def debug_check():
     issues.append(f"OPENTOPO_API_KEY: {'SET' if config.OPENTOPO_API_KEY else 'MISSING'}")
     issues.append(f"OPENTOPOGRAPHY_API_KEY: {'SET' if config.OPENTOPOGRAPHY_API_KEY else 'MISSING'}")
     try:
-        from data_fetchers.elevation_fetcher import HAS_RASTERIO
+        from data_fetchers.elevation_fetcher import HAS_RASTERIO, HAS_PILLOW
         issues.append(f"rasterio: {'AVAILABLE' if HAS_RASTERIO else 'NOT_AVAILABLE'}")
+        issues.append(f"pillow: {'AVAILABLE' if HAS_PILLOW else 'NOT_AVAILABLE'}")
     except Exception as e:
-        issues.append(f"rasterio check FAILED: {e}")
+        issues.append(f"image library check FAILED: {e}")
     
     return jsonify({"checks": issues})
 
