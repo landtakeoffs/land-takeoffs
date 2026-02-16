@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Land Takeoffs — Site Analysis & Cost Estimation for Land Developers</title>
+<meta name="description" content="Instant terrain analysis, parcel data, and bid estimation for civil engineers, land developers, and contractors. Built for Upstate SC.">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --cyan: #00d4ff;
+    --cyan-dim: #00d4ff88;
+    --green: #00ff88;
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --radius: 12px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Pro', 'Segoe UI', Helvetica, sans-serif; line-height: 1.6; }
+  a { color: var(--cyan); text-decoration: none; }
+
+  /* NAV */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 2rem; max-width: 1200px; margin: 0 auto; }
+  nav img { height: 40px; }
+  .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+  .nav-links a { color: var(--text-dim); font-size: 0.95rem; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--text); }
+
+  /* BUTTONS */
+  .btn { display: inline-block; padding: 0.75rem 1.8rem; border-radius: 8px; font-weight: 600; font-size: 1rem; transition: all 0.2s; cursor: pointer; border: none; }
+  .btn-primary { background: linear-gradient(135deg, var(--cyan), var(--green)); color: #0a0a0f; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px #00d4ff33; }
+  .btn-outline { border: 1.5px solid var(--cyan-dim); color: var(--cyan); background: transparent; }
+  .btn-outline:hover { background: #00d4ff11; }
+  .btn-sm { padding: 0.5rem 1.2rem; font-size: 0.9rem; }
+
+  /* HERO */
+  .hero { text-align: center; padding: 6rem 2rem 4rem; max-width: 900px; margin: 0 auto; }
+  .hero h1 { font-size: 3.2rem; font-weight: 800; line-height: 1.15; margin-bottom: 1.2rem; }
+  .hero h1 span { background: linear-gradient(135deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero p { font-size: 1.25rem; color: var(--text-dim); max-width: 650px; margin: 0 auto 2.5rem; }
+  .hero-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+  /* SOCIAL PROOF */
+  .proof { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.95rem; }
+
+  /* FEATURES */
+  .features { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
+  .features h2 { text-align: center; font-size: 2rem; margin-bottom: 0.5rem; }
+  .features .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 3rem; font-size: 1.1rem; }
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+  .feature-card { background: var(--bg2); border: 1px solid #ffffff0a; border-radius: var(--radius); padding: 2rem; transition: border-color 0.3s; }
+  .feature-card:hover { border-color: var(--cyan-dim); }
+  .feature-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+  .feature-card h3 { font-size: 1.15rem; margin-bottom: 0.5rem; }
+  .feature-card p { color: var(--text-dim); font-size: 0.95rem; }
+
+  /* HOW IT WORKS */
+  .how { max-width: 900px; margin: 0 auto; padding: 5rem 2rem; }
+  .how h2 { text-align: center; font-size: 2rem; margin-bottom: 3rem; }
+  .steps { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .step { flex: 1; min-width: 220px; max-width: 280px; text-align: center; }
+  .step-num { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan), var(--green)); color: var(--bg); font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+  .step h3 { margin-bottom: 0.5rem; }
+  .step p { color: var(--text-dim); font-size: 0.9rem; }
+
+  /* WHO */
+  .who { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
+  .who h2 { text-align: center; font-size: 2rem; margin-bottom: 2.5rem; }
+  .who-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; }
+  .who-card { background: var(--bg2); border-radius: var(--radius); padding: 1.5rem; text-align: center; border: 1px solid #ffffff0a; }
+  .who-card .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .who-card h3 { font-size: 1rem; margin-bottom: 0.3rem; }
+  .who-card p { color: var(--text-dim); font-size: 0.85rem; }
+
+  /* PRICING */
+  .pricing { max-width: 800px; margin: 0 auto; padding: 5rem 2rem; text-align: center; }
+  .pricing h2 { font-size: 2rem; margin-bottom: 0.5rem; }
+  .pricing .subtitle { color: var(--text-dim); margin-bottom: 3rem; font-size: 1.1rem; }
+  .price-cards { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
+  .price-card { background: var(--bg2); border: 1px solid #ffffff0a; border-radius: var(--radius); padding: 2.5rem 2rem; flex: 1; min-width: 260px; max-width: 340px; }
+  .price-card.featured { border-color: var(--cyan); }
+  .price-card h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .price-amount { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.25rem; }
+  .price-amount span { font-size: 1rem; font-weight: 400; color: var(--text-dim); }
+  .price-card ul { list-style: none; text-align: left; margin: 1.5rem 0; }
+  .price-card li { padding: 0.4rem 0; color: var(--text-dim); font-size: 0.9rem; }
+  .price-card li::before { content: "✓ "; color: var(--green); font-weight: 700; }
+
+  /* CTA */
+  .cta { text-align: center; padding: 5rem 2rem; background: var(--bg2); margin-top: 2rem; }
+  .cta h2 { font-size: 2.2rem; margin-bottom: 1rem; }
+  .cta p { color: var(--text-dim); margin-bottom: 2rem; font-size: 1.1rem; }
+
+  /* FOOTER */
+  footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.85rem; border-top: 1px solid #ffffff08; }
+
+  /* MOBILE */
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 2.2rem; }
+    .hero p { font-size: 1.05rem; }
+    nav { padding: 1rem; }
+    .features, .how, .who, .pricing { padding: 3rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <img src="/static/logo-wide.svg" alt="Land Takeoffs">
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/app" class="btn btn-sm btn-outline">Launch App</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Site analysis & bid estimates<br><span>in minutes, not days.</span></h1>
+  <p>Click a parcel, analyze terrain, and generate a full cost estimate — all from your browser. Built by Licensed Contractors.</p>
+  <div class="hero-buttons">
+    <a href="/app" class="btn btn-primary">Try It Free →</a>
+    <a href="#features" class="btn btn-outline">See How It Works</a>
+  </div>
+</section>
+
+<div class="proof">
+  Built for land developers, civil engineers & grading contractors in the Upstate SC market
+</div>
+
+<section class="features" id="features">
+  <h2>Everything you need for a land takeoff</h2>
+  <p class="subtitle">From raw parcel to bid-ready estimate in one tool.</p>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🗺️</div>
+      <h3>Interactive Parcel Map</h3>
+      <p>Click any parcel in Greenville County to pull owner info, PIN, acreage, and assessed value — straight from county GIS.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⛰️</div>
+      <h3>Terrain Analysis</h3>
+      <p>Get elevation profiles, slope analysis, buildability scores, and optimal pad elevations from USGS topographic data.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📐</div>
+      <h3>Cut & Fill Volumes</h3>
+      <p>Automatic earthwork calculations — cut/fill volumes, net material balance, and hauling estimates based on real terrain.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💰</div>
+      <h3>Bid Estimate Builder</h3>
+      <p>45 line items across 8 categories — calibrated to Upstate SC unit prices. Edit quantities, adjust prices, download as Excel.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔢</div>
+      <h3>Auto-Estimate Calculator</h3>
+      <p>Enter 5 site parameters and get a full estimate generated automatically using industry-standard land allocation rules.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Export to Excel</h3>
+      <p>Download professional bid spreadsheets ready to send to developers, lenders, or your own records.</p>
+    </div>
+  </div>
+</section>
+
+<section class="how" id="how">
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Select a Site</h3>
+      <p>Click a parcel on the map or search by address to pull in property data and boundaries.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Analyze Terrain</h3>
+      <p>Draw your site boundary to get elevation, slope, buildability, and earthwork volumes.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Generate Estimate</h3>
+      <p>Use the auto-calculator or build line-by-line. Download the finished bid as an Excel workbook.</p>
+    </div>
+  </div>
+</section>
+
+<section class="who">
+  <h2>Built for</h2>
+  <div class="who-grid">
+    <div class="who-card">
+      <div class="icon">🏗️</div>
+      <h3>Grading Contractors</h3>
+      <p>Faster takeoffs, better bids</p>
+    </div>
+    <div class="who-card">
+      <div class="icon">📋</div>
+      <h3>Civil Engineers</h3>
+      <p>Quick site feasibility analysis</p>
+    </div>
+    <div class="who-card">
+      <div class="icon">🏘️</div>
+      <h3>Land Developers</h3>
+      <p>Due diligence before you buy</p>
+    </div>
+    <div class="who-card">
+      <div class="icon">🏛️</div>
+      <h3>City Officials</h3>
+      <p>Review submissions with data</p>
+    </div>
+  </div>
+</section>
+
+<section class="pricing" id="pricing">
+  <h2>Simple pricing</h2>
+  <p class="subtitle">Start free. Upgrade when you're ready.</p>
+  <div class="price-cards">
+    <div class="price-card">
+      <h3>Free</h3>
+      <div class="price-amount">$0 <span>/mo</span></div>
+      <ul>
+        <li>Parcel map & property data</li>
+        <li>3 terrain analyses / month</li>
+        <li>Bid estimate builder</li>
+        <li>Excel export</li>
+      </ul>
+      <a href="/app" class="btn btn-outline" style="width:100%;text-align:center;">Get Started</a>
+    </div>
+    <div class="price-card featured">
+      <h3>Pro</h3>
+      <div class="price-amount">$49 <span>/mo</span></div>
+      <ul>
+        <li>Everything in Free</li>
+        <li>Unlimited terrain analyses</li>
+        <li>Auto-estimate calculator</li>
+        <li>Saved projects & history</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="/app" class="btn btn-primary" style="width:100%;text-align:center;">Coming Soon</a>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <h2>Ready to speed up your takeoffs?</h2>
+  <p>Stop eyeballing topo maps. Get real data in minutes.</p>
+  <a href="/app" class="btn btn-primary">Launch App — It's Free →</a>
+</section>
+
+<footer>
+  &copy; 2026 Land Takeoffs. Built in Greenville, SC.
+</footer>
+
+</body>
+</html>

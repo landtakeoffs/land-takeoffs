@@ -346,12 +346,19 @@ def geocode():
 
 
 @app.route("/", methods=["GET"])
+def landing():
+    """Serve the landing page."""
+    return app.send_static_file("landing.html")
+
+
+@app.route("/app", methods=["GET"])
 def index():
     """Serve the web UI."""
     return app.send_static_file("index.html")
 
 
 @app.route("/estimate", methods=["GET"])
+@app.route("/app/estimate", methods=["GET"])
 def estimate_page():
     """Serve the estimate builder UI."""
     return app.send_static_file("estimate.html")
