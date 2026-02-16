@@ -192,7 +192,9 @@ function generatePlan() {
   const roadDraw = Math.min(roadPx, 18); // cap visual road width so it doesn't dominate
   const lotWPx = lotWidth * scale;
   const lotDPx = lotDepth * scale;
-  const gap = 1; // pixel gap between lots
+  const sideGap = Math.max(setbackSide * scale * 2, 4); // side-to-side spacing (both setbacks)
+  const frontGap = Math.max(setbackFront * scale, 4);  // front setback from road
+  const gap = sideGap; // default gap between lots
 
   // Developable area (inside buffer)
   const devX = ox + bufPx;
@@ -253,13 +255,13 @@ function generatePlan() {
       if (road.type === 'entry') continue;
 
       if (road.w > road.h) {
-        // HORIZONTAL road → lots above and below (width along road, depth away)
-        placeLotRow(road.x, road.y - lotDPx - gap, road.w, lotWPx, lotDPx, gap, 'above');
-        placeLotRow(road.x, road.y + road.h + gap, road.w, lotWPx, lotDPx, gap, 'below');
+        // HORIZONTAL road → lots above and below
+        placeLotRow(road.x, road.y - lotDPx - frontGap, road.w, lotWPx, lotDPx, gap, 'above');
+        placeLotRow(road.x, road.y + road.h + frontGap, road.w, lotWPx, lotDPx, gap, 'below');
       } else {
-        // VERTICAL road → lots left and right (rotated: depth perpendicular, width along road)
-        placeLotCol(road.x - lotDPx - gap, road.y, road.h, lotWPx, lotDPx, gap, 'left');
-        placeLotCol(road.x + road.w + gap, road.y, road.h, lotWPx, lotDPx, gap, 'right');
+        // VERTICAL road → lots left and right
+        placeLotCol(road.x - lotDPx - frontGap, road.y, road.h, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(road.x + road.w + frontGap, road.y, road.h, lotWPx, lotDPx, gap, 'right');
       }
     }
 
@@ -287,17 +289,13 @@ function generatePlan() {
     roads.push({ type: 'loop', x: loopX, y: loopY, w: loopW, h: loopH, r: cornerR, roadPx: roadDraw, label: projectName.toUpperCase() + ' LOOP' });
 
     // Outside lots — proper rectangles facing the road
-    // Top: lots with depth going UP from road
-    const topLotY = loopY - rw / 2 - gap - lotDPx;
+    const topLotY = loopY - rw / 2 - frontGap - lotDPx;
     placeLotRow(loopX + cornerR, topLotY, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'above');
-    // Bottom
-    const botLotY = loopY + loopH + rw / 2 + gap;
+    const botLotY = loopY + loopH + rw / 2 + frontGap;
     placeLotRow(loopX + cornerR, botLotY, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'below');
-    // Left side: lots rotated — width (short side) along road, depth going LEFT
-    const leftLotX = loopX - rw / 2 - gap - lotDPx;
+    const leftLotX = loopX - rw / 2 - frontGap - lotDPx;
     placeLotColProper(leftLotX, loopY + cornerR, loopH - cornerR * 2, lotDPx, lotWPx, gap);
-    // Right side
-    const rightLotX = loopX + loopW + rw / 2 + gap;
+    const rightLotX = loopX + loopW + rw / 2 + frontGap;
     placeLotColProper(rightLotX, loopY + cornerR, loopH - cornerR * 2, lotDPx, lotWPx, gap);
 
     // Inside loop — add a center street and lots on both sides
@@ -312,12 +310,12 @@ function generatePlan() {
     grid.add(insideX, innerRoadY, insideW, roadDraw, 'road');
 
     // Lots above inner street
-    const innerTopY = innerRoadY - gap - lotDPx;
+    const innerTopY = innerRoadY - frontGap - lotDPx;
     if (innerTopY > insideY) {
       placeLotRow(insideX, innerTopY, insideW, lotWPx, lotDPx, gap, 'above');
     }
     // Lots below inner street
-    const innerBotY = innerRoadY + roadDraw + gap;
+    const innerBotY = innerRoadY + roadDraw + frontGap;
     if (innerBotY + lotDPx < insideY + insideH) {
       placeLotRow(insideX, innerBotY, insideW, lotWPx, lotDPx, gap, 'below');
     }
@@ -344,8 +342,8 @@ function generatePlan() {
         roads.push({ type: 'bulb', cx: bx + rd / 2, cy: topY + bulbR, r: bulbR });
         grid.add(bx - bulbR, topY, bulbR * 2 + rd, bulbR * 2, 'road');
 
-        placeLotCol(bx - lotDPx - gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
-        placeLotCol(bx + rd + gap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+        placeLotCol(bx - lotDPx - frontGap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + rd + frontGap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
       }
 
       if (branchLen > lotWPx) {
@@ -355,22 +353,22 @@ function generatePlan() {
         roads.push({ type: 'bulb', cx: bx + rd / 2, cy: botStart + branchLen - bulbR, r: bulbR });
         grid.add(bx - bulbR, botStart + branchLen - bulbR * 2, bulbR * 2 + rd, bulbR * 2, 'road');
 
-        placeLotCol(bx - lotDPx - gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
-        placeLotCol(bx + rd + gap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+        placeLotCol(bx - lotDPx - frontGap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + rd + frontGap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
       }
     }
 
-    placeLotRow(devX, mainY - lotDPx - gap, devW, lotWPx, lotDPx, gap, 'above');
-    placeLotRow(devX, mainY + rd + gap, devW, lotWPx, lotDPx, gap, 'below');
+    placeLotRow(devX, mainY - lotDPx - frontGap, devW, lotWPx, lotDPx, gap, 'above');
+    placeLotRow(devX, mainY + rd + frontGap, devW, lotWPx, lotDPx, gap, 'below');
   }
 
   // ---- Lot placement helpers (use collision grid) ----
   function placeLotRow(startX, y, length, lw, lh, g, side) {
-    if (y < oy || y + lh > oy + propH) return; // outside property
-    for (let x = startX + g; x + lw <= startX + length - g; x += lw + g) {
+    if (y < oy || y + lh > oy + propH) return;
+    for (let x = startX + sideGap; x + lw <= startX + length - sideGap; x += lw + sideGap) {
       if (x < devX || x + lw > devX + devW) continue;
       if (y < devY || y + lh > devY + devH) continue;
-      if (grid.fits(x, y, lw, lh, 1)) {
+      if (grid.fits(x, y, lw, lh, 2)) {
         lots.push({ x, y, w: lw, h: lh, num: lotNumber++ });
         grid.add(x, y, lw, lh, 'lot');
       }
@@ -378,25 +376,23 @@ function generatePlan() {
   }
 
   function placeLotCol(x, startY, length, lw, lh, g, side) {
-    // Vertical road: lots rotated — lotWidth along road (height), lotDepth perpendicular (width)
-    const lotW = lotDPx; // depth goes perpendicular to road
-    const lotH = lotWPx; // width goes along road
-    for (let y = startY + g; y + lotH <= startY + length - g; y += lotH + g) {
+    const lotW = lotDPx;
+    const lotH = lotWPx;
+    for (let y = startY + sideGap; y + lotH <= startY + length - sideGap; y += lotH + sideGap) {
       if (y < devY || y + lotH > devY + devH) continue;
       if (x < devX || x + lotW > devX + devW) continue;
-      if (grid.fits(x, y, lotW, lotH, 1)) {
+      if (grid.fits(x, y, lotW, lotH, 2)) {
         lots.push({ x, y, w: lotW, h: lotH, num: lotNumber++ });
         grid.add(x, y, lotW, lotH, 'lot');
       }
     }
   }
 
-  // For loop sides — explicit w/h control
   function placeLotColProper(x, startY, length, w, h, g) {
-    for (let y = startY + g; y + h <= startY + length - g; y += h + g) {
+    for (let y = startY + sideGap; y + h <= startY + length - sideGap; y += h + sideGap) {
       if (y < devY || y + h > devY + devH) continue;
       if (x < devX || x + w > devX + devW) continue;
-      if (grid.fits(x, y, w, h, 1)) {
+      if (grid.fits(x, y, w, h, 2)) {
         lots.push({ x, y, w, h, num: lotNumber++ });
         grid.add(x, y, w, h, 'lot');
       }
