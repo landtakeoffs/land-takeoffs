@@ -86,7 +86,11 @@
 
       <div class="row">
         <div><label>Front Setback (ft)</label><input type="number" id="setbackFront" value="25" step="5"></div>
-        <div><label>Side Setback (ft)</label><input type="number" id="setbackSide" value="10" step="5"></div>
+        <div><label>Rear Setback (ft)</label><input type="number" id="setbackRear" value="25" step="5"></div>
+      </div>
+      <div class="row">
+        <div><label>Side Setback (ft)</label><input type="number" id="setbackSide" value="10" step="1"></div>
+        <div><label>House Width (ft)</label><input type="number" id="houseWidth" value="40" step="5" min="20"></div>
       </div>
       <div class="row">
         <div><label>Perimeter Buffer (ft)</label><input type="number" id="perimBuffer" value="50" step="10"></div>
@@ -118,7 +122,8 @@
         <div class="legend-item"><div class="legend-swatch" style="background:#ffffcc;border-color:#aa9;"></div> Residential Lots</div>
         <div class="legend-item"><div class="legend-swatch" style="background:#cce5ff;border-color:#69a;"></div> Retention Pond</div>
         <div class="legend-item"><div class="legend-swatch" style="background:#d5f5d5;border-color:#6a6;"></div> Open Space / Buffer</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:none;border:2px dashed #c66;"></div> Setback Lines</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:none;border:2px dashed #c66;"></div> Building Envelope</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(180,160,140,0.35);border-color:#987;"></div> House Footprint</div>
       </div>
     </div>
 
@@ -486,33 +491,74 @@ function generatePlan() {
     }
   }
 
-  // ---- Draw lots ----
+  // ---- Draw lots with building envelopes and house footprints ----
+  const sbSidePx = setbackSide * scale;
+  const sbFrontPx = setbackFront * scale;
+  const sbRearPx = parseFloat(document.getElementById('setbackRear').value) * scale;
+  const houseWidthFt = parseFloat(document.getElementById('houseWidth').value);
+  const houseWPx = houseWidthFt * scale;
+  const houseDepthPx = houseWPx * 0.6; // typical ranch/2-story proportion
+
   for (const lot of lots) {
-    // Fill
+    // Lot fill — light cream
     ctx.fillStyle = '#fffde6';
-    ctx.strokeStyle = '#bba';
-    ctx.lineWidth = 0.8;
-    roundRect(lot.x, lot.y, lot.w, lot.h, 1);
-    ctx.fill();
-    ctx.stroke();
+    ctx.strokeStyle = '#998';
+    ctx.lineWidth = 1;
+    ctx.fillRect(lot.x, lot.y, lot.w, lot.h);
+    ctx.strokeRect(lot.x, lot.y, lot.w, lot.h);
 
-    // Setback dashed line (building envelope)
-    const sbx = Math.min(lot.w * 0.15, 8);
-    const sby = Math.min(lot.h * 0.15, 8);
-    ctx.strokeStyle = 'rgba(180,80,80,0.35)';
-    ctx.lineWidth = 0.4;
-    ctx.setLineDash([2, 2]);
-    ctx.strokeRect(lot.x + sbx, lot.y + sby, lot.w - sbx * 2, lot.h - sby * 2);
-    ctx.setLineDash([]);
+    // Building envelope (setback lines) — dashed red
+    const envX = lot.x + sbSidePx;
+    const envY = lot.y + sbFrontPx;
+    const envW = lot.w - sbSidePx * 2;
+    const envH = lot.h - sbFrontPx - sbRearPx;
 
-    // Lot number
-    ctx.fillStyle = '#555';
-    ctx.font = Math.min(9, lot.w * 0.18) + 'px -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(lot.num, lot.x + lot.w / 2, lot.y + lot.h / 2);
+    if (envW > 4 && envH > 4) {
+      ctx.strokeStyle = 'rgba(200,80,80,0.4)';
+      ctx.lineWidth = 0.6;
+      ctx.setLineDash([3, 2]);
+      ctx.strokeRect(envX, envY, envW, envH);
+      ctx.setLineDash([]);
+
+      // House footprint — centered in envelope
+      const hw = Math.min(houseWPx, envW - 4);
+      const hh = Math.min(houseDepthPx, envH - 4);
+      if (hw > 6 && hh > 6) {
+        const hx = envX + (envW - hw) / 2;
+        const hy = envY + (envH - hh) * 0.35; // house sits closer to front
+        ctx.fillStyle = 'rgba(180,160,140,0.35)';
+        ctx.strokeStyle = 'rgba(120,100,80,0.5)';
+        ctx.lineWidth = 0.8;
+        ctx.fillRect(hx, hy, hw, hh);
+        ctx.strokeRect(hx, hy, hw, hh);
+
+        // Garage bump
+        const garW = hw * 0.35;
+        const garH = hh * 0.25;
+        ctx.fillRect(hx + hw * 0.1, hy + hh, garW, garH);
+        ctx.strokeRect(hx + hw * 0.1, hy + hh, garW, garH);
+
+        // Driveway line to road
+        ctx.strokeStyle = 'rgba(150,150,150,0.4)';
+        ctx.lineWidth = Math.max(hw * 0.12, 1.5);
+        ctx.beginPath();
+        const driveX = hx + hw * 0.1 + garW / 2;
+        ctx.moveTo(driveX, hy + hh + garH);
+        ctx.lineTo(driveX, lot.y + lot.h);
+        ctx.stroke();
+      }
+    }
+
+    // Lot number — small, bottom-right corner
+    ctx.fillStyle = '#777';
+    const fontSize = Math.max(7, Math.min(9, lot.w * 0.12));
+    ctx.font = fontSize + 'px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(lot.num, lot.x + lot.w - 3, lot.y + lot.h - 2);
   }
   ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
 
   // ---- Retention pond ----
   // Outer glow
@@ -658,7 +704,8 @@ function generatePlan() {
   ctx.font = '10px -apple-system, sans-serif';
   ctx.fillText('Lot Dimensions: ' + lotWidth + '\' × ' + lotDepth + '\' (' + (lotWidth * lotDepth).toLocaleString() + ' SF)', mx, tbY + 24);
   ctx.fillText('Road ROW: ' + roadWidth + '\'', mx, tbY + 40);
-  ctx.fillText('Setbacks: ' + setbackFront + '\' front  /  ' + setbackSide + '\' side', mx, tbY + 56);
+  const setbackRear = parseFloat(document.getElementById('setbackRear').value);
+  ctx.fillText('Setbacks: ' + setbackFront + '\' front / ' + setbackRear + '\' rear / ' + setbackSide + '\' side', mx, tbY + 56);
   ctx.fillText('Perimeter Buffer: ' + perimBuffer + '\'', mx, tbY + 72);
   ctx.fillText('Stormwater: ' + (pondPct * 100).toFixed(0) + '%  (' + (pondArea / 43560).toFixed(2) + ' ac)', mx, tbY + 88);
 
