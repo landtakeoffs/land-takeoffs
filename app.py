@@ -13,20 +13,12 @@ ElevationFetcher = None
 TerrainAnalyzer = None
 
 def _load_heavy_modules():
-    global ParcelFetcher, ElevationFetcher, TerrainAnalyzer
+    global ElevationFetcher, TerrainAnalyzer
     if TerrainAnalyzer is None:
-        try:
-            from data_fetchers.parcel_fetcher import ParcelFetcher as _PF
-            ParcelFetcher = _PF
-        except Exception:
-            pass  # geopandas/regrid not available — that's fine
-        try:
-            from data_fetchers.elevation_fetcher import ElevationFetcher as _EF
-            from analysis.terrain_analysis import TerrainAnalyzer as _TA
-            ElevationFetcher = _EF
-            TerrainAnalyzer = _TA
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Failed to load terrain modules: {e}")
+        from data_fetchers.elevation_fetcher import ElevationFetcher as _EF
+        from analysis.terrain_analysis import TerrainAnalyzer as _TA
+        ElevationFetcher = _EF
+        TerrainAnalyzer = _TA
 
 logging.basicConfig(
     level=logging.INFO,
