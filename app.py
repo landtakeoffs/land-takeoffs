@@ -37,6 +37,28 @@ app.json.sort_keys = False  # preserve dict key order
 CORS(app)
 
 
+@app.route("/api/debug", methods=["GET"])
+def debug_check():
+    """Test heavy module loading."""
+    issues = []
+    try:
+        import numpy as np
+        issues.append(f"numpy OK: {np.__version__}")
+    except Exception as e:
+        issues.append(f"numpy FAIL: {e}")
+    try:
+        from scipy import ndimage
+        issues.append("scipy.ndimage OK")
+    except Exception as e:
+        issues.append(f"scipy FAIL: {e}")
+    try:
+        _load_heavy_modules()
+        issues.append(f"heavy modules OK: EF={ElevationFetcher}, TA={TerrainAnalyzer}")
+    except Exception as e:
+        issues.append(f"heavy modules FAIL: {e}")
+    return jsonify({"checks": issues})
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     """Health-check endpoint."""
