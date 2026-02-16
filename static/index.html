@@ -7,8 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2300d4ff'/%3E%3Cstop offset='100%25' stop-color='%2300ff88'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0f'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18 L52 44 Z' fill='url(%23g)' opacity='0.15'/%3E%3Ccircle cx='52' cy='18' r='3.5' fill='%2300ff88'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+<!-- draw tools removed -->
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
 <style>
   :root {
@@ -181,28 +180,13 @@
       <div id="parcelResults" style="display:none;max-height:250px;overflow-y:auto;margin-top:10px;"></div>
     </div>
 
-    <!-- Coordinate Input -->
-    <div class="card">
-      <h3>📍 Site Location</h3>
-      <p style="font-size: 0.8em; color: var(--muted); margin-bottom: 8px;">
-        Draw a rectangle on the map or enter coordinates manually.
-      </p>
-      <div class="row">
-        <div><label>South Lat</label><input type="number" id="south" step="0.001" placeholder="34.85"></div>
-        <div><label>North Lat</label><input type="number" id="north" step="0.001" placeholder="34.86"></div>
-      </div>
-      <div class="row">
-        <div><label>West Lng</label><input type="number" id="west" step="0.001" placeholder="-82.40"></div>
-        <div><label>East Lng</label><input type="number" id="east" step="0.001" placeholder="-82.39"></div>
-      </div>
-      <p id="shapeInfo" style="display:none; font-size:0.8em; color:var(--green); margin-top:8px;">✓ Polygon drawn</p>
-      <label>Max Buildable Slope (°)</label>
-      <input type="number" id="maxSlope" value="15" min="1" max="45">
-      <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalysis()">
-        Analyze Terrain
-      </button>
-      <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-    </div>
+    <!-- Hidden coordinate storage -->
+    <input type="hidden" id="south"><input type="hidden" id="north">
+    <input type="hidden" id="west"><input type="hidden" id="east">
+    <input type="hidden" id="maxSlope" value="15">
+    <div id="shapeInfo" style="display:none;"></div>
+    <div id="analyzeBtn" style="display:none;"></div>
+    <div id="progressBar" style="display:none;"><div id="progressFill"></div></div>
 
     <!-- Results -->
     <div class="results" id="results">
@@ -252,8 +236,8 @@
       <div class="search-results" id="searchResults"></div>
     </div>
     <div class="instructions" id="instructions">
-      <h4>Select the Parcel You Want to Develop</h4>
-      <p>Zoom in and click a parcel, or search by address above.</p>
+      <h4>Click a Parcel to Get Started</h4>
+      <p>Zoom in and click any parcel — terrain analysis runs automatically.</p>
     </div>
   </div>
 </div>
@@ -278,66 +262,7 @@ L.control.layers({
   'Satellite': satellite,
 }).addTo(map);
 
-// Draw controls
-const drawnItems = new L.FeatureGroup();
-map.addLayer(drawnItems);
-
-const drawControl = new L.Control.Draw({
-  draw: {
-    rectangle: { shapeOptions: { color: '#00d4ff', weight: 2, fillOpacity: 0.15 } },
-    polygon: { shapeOptions: { color: '#00d4ff', weight: 2, fillOpacity: 0.15 }, allowIntersection: false },
-    polyline: false, circle: false, circlemarker: false, marker: false,
-  },
-  edit: { featureGroup: drawnItems },
-});
-map.addControl(drawControl);
-
-let currentRect = null;
-let drawnPolygon = null;  // store polygon coords for future parcel-level analysis
-
-map.on(L.Draw.Event.CREATED, function(e) {
-  drawnItems.clearLayers();
-  currentRect = e.layer;
-  drawnItems.addLayer(currentRect);
-
-  // Get bounding box regardless of shape type
-  const bounds = currentRect.getBounds();
-  document.getElementById('south').value = bounds.getSouth().toFixed(5);
-  document.getElementById('north').value = bounds.getNorth().toFixed(5);
-  document.getElementById('west').value = bounds.getWest().toFixed(5);
-  document.getElementById('east').value = bounds.getEast().toFixed(5);
-
-  // If polygon, store the actual vertex coordinates
-  if (e.layerType === 'polygon') {
-    drawnPolygon = currentRect.getLatLngs()[0].map(p => [p.lat, p.lng]);
-    document.getElementById('shapeInfo').textContent = drawnPolygon.length + '-point polygon drawn';
-    document.getElementById('shapeInfo').style.display = 'block';
-  } else {
-    drawnPolygon = null;
-    document.getElementById('shapeInfo').style.display = 'none';
-  }
-
-  document.getElementById('instructions').classList.add('hidden');
-});
-
-// Update map rect when coords change manually
-['south','north','west','east'].forEach(id => {
-  document.getElementById(id).addEventListener('change', updateRectFromInputs);
-});
-
-function updateRectFromInputs() {
-  const s = parseFloat(document.getElementById('south').value);
-  const n = parseFloat(document.getElementById('north').value);
-  const w = parseFloat(document.getElementById('west').value);
-  const e = parseFloat(document.getElementById('east').value);
-  if (isNaN(s) || isNaN(n) || isNaN(w) || isNaN(e)) return;
-
-  drawnItems.clearLayers();
-  currentRect = L.rectangle([[s, w], [n, e]], { color: '#00d4ff', weight: 2, fillOpacity: 0.15 });
-  drawnItems.addLayer(currentRect);
-  map.fitBounds(currentRect.getBounds(), { padding: [50, 50] });
-  document.getElementById('instructions').classList.add('hidden');
-}
+// (Draw tools removed — terrain analysis auto-runs on parcel click)
 
 // Analysis
 function runAnalysis() {
@@ -629,6 +554,9 @@ map.on('click', async function(e) {
 
     // Popup
     poly.bindPopup(parcelPopup(attr)).openPopup();
+
+    // Auto-run terrain analysis
+    analyzeSelectedParcel();
   } catch (err) {
     console.error('Identify error:', err);
   }
