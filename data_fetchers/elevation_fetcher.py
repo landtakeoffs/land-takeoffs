@@ -68,7 +68,18 @@ class ElevationFetcher:
             raise RuntimeError("requests library is required")
 
         response = requests.get(url, params=params, timeout=120)
-        response.raise_for_status()
+
+        # Check for API errors (OpenTopography returns HTML/text on errors)
+        ct = response.headers.get('content-type', '')
+        if response.status_code != 200 or 'tiff' not in ct.lower() and 'octet' not in ct.lower():
+            logger.error("OpenTopography error: status=%s, content-type=%s, body=%s",
+                         response.status_code, ct, response.text[:500])
+            raise RuntimeError(f"OpenTopography API error: {response.text[:200]}")
+
+        if len(response.content) < 100:
+            logger.error("OpenTopography returned tiny response (%d bytes): %s",
+                         len(response.content), response.text[:200])
+            raise RuntimeError("OpenTopography returned empty/invalid DEM data")
 
         if HAS_RASTERIO:
             return self._parse_with_rasterio(response.content)
