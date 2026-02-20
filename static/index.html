@@ -19,7 +19,32 @@
   body { font-family: -apple-system, 'SF Pro', sans-serif; background: var(--bg); color: var(--text); }
 
   /* Layout */
-  .app { display: grid; grid-template-columns: 380px 1fr; grid-template-rows: 60px 1fr; height: 100vh; }
+  .app { display: grid; grid-template-columns: 380px 1fr; grid-template-rows: 60px 1fr; height: 100vh; transition: grid-template-columns 0.35s ease; }
+  .app.analysis-mode { grid-template-columns: 50vw 1fr; }
+  .app.analysis-mode .sidebar { padding: 24px; }
+  .app.analysis-mode .results.visible {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .app.analysis-mode .results.visible .card {
+    margin-bottom: 0;
+    padding: 20px;
+    border-width: 1.5px;
+  }
+  .app.analysis-mode .results.visible .card h3 {
+    font-size: 1.02em;
+    margin-bottom: 14px;
+  }
+  .app.analysis-mode .results.visible .stat {
+    padding: 9px 0;
+    font-size: 0.98em;
+  }
+  .app.analysis-mode .results.visible .stat-label { font-size: 0.95em; }
+  .app.analysis-mode .results.visible .stat-value { font-size: 1.02em; }
+  .app.analysis-mode .results.visible #devTypeSelector { grid-column: 1 / -1; }
+  .app.analysis-mode .results.visible .meter { height: 32px; }
+  .app.analysis-mode .results.visible .meter-text { font-size: 0.95em; }
   header { grid-column: 1 / -1; background: var(--panel); border-bottom: 1px solid var(--border);
            display: flex; align-items: center; padding: 0 24px; gap: 16px; }
   header h1 { font-size: 1.3em; color: var(--cyan); font-weight: 600; }
@@ -135,6 +160,11 @@
   .modal-btn-icon { font-size: 2.5em; margin-bottom: 12px; }
   .modal-btn-title { color: var(--text); font-weight: 600; font-size: 1.1em; margin-bottom: 6px; }
   .modal-btn-desc { color: var(--muted); font-size: 0.85em; line-height: 1.4; }
+
+  @media (max-width: 1200px) {
+    .app.analysis-mode { grid-template-columns: 1fr; }
+    .app.analysis-mode .results.visible { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -148,6 +178,8 @@
         <span style="color:var(--muted);font-size:0.75em;letter-spacing:0.5px;">SITE ANALYSIS & ESTIMATION</span>
       </div>
     </div>
+    <a href="/estimate?type=residential" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">🏘️ Residential</a>
+    <a href="/estimate?type=commercial" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">🏢 Commercial</a>
     <div class="status"><span class="dot"></span>Online</div>
   </header>
 
@@ -371,6 +403,8 @@ async function runAnalysisWithCoords(south, north, west, east) {
 function displayResults(d) {
   const resultsEl = document.getElementById('results');
   resultsEl.classList.add('visible');
+  const appLayout = document.querySelector('.app');
+  if (appLayout) appLayout.classList.add('analysis-mode');
   // Auto-scroll sidebar to results
   setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 
