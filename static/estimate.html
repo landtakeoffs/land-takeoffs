@@ -623,7 +623,7 @@ function autoEstimate() {
 
   // Derived from land allocation
   const padSF = lotSizeSF;
-  const roadPerLot = 175;  // industry standard: ~175 LF road per lot
+  const roadPerLot = 120;  // calibrated baseline: ~120 LF road per lot
   const paveWidth = 24;    // standard 24' face-to-face
   const topsoilIn = 6;     // standard 6" topsoil strip
   const hasPond = true;    // always assume detention required
@@ -664,12 +664,12 @@ function autoEstimate() {
   const perimeterLF = Math.round((siteWidth + siteLength) * 2);
 
   // Storm drainage: pipe runs alongside roads, plus laterals to inlets
-  const stormPipeLF = Math.round(totalRoadLF * 0.85); // ~85% of road length needs storm pipe
+  const stormPipeLF = Math.round(totalRoadLF * 0.55); // calibrated baseline: ~55% of road length in storm pipe
   const inlets = Math.max(4, Math.round(totalRoadLF / 300)); // 1 inlet every 300 LF (SC standard)
   const stormMH = Math.max(2, Math.round(stormPipeLF / 400)); // junction every 400 LF
   // Pipe size distribution based on user selection
-  const pipeSplit15 = avgPipe === '15' ? 0.55 : avgPipe === '18' ? 0.25 : 0.10;
-  const pipeSplit18 = avgPipe === '15' ? 0.30 : avgPipe === '18' ? 0.45 : 0.30;
+  const pipeSplit15 = avgPipe === '15' ? 0.70 : avgPipe === '18' ? 0.45 : 0.20;
+  const pipeSplit18 = avgPipe === '15' ? 0.25 : avgPipe === '18' ? 0.45 : 0.40;
   const pipeSplit24 = 1 - pipeSplit15 - pipeSplit18;
 
   // Pond sizing based on stormwater allocation: ~2000 CY/acre of pond, ~1500 SY grading

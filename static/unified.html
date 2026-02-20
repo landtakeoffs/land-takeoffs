@@ -1160,7 +1160,7 @@ function autoEstimate() {
 
   const padSF = lotSizeSF;
   // Conservative road + paving calibration to avoid overestimating PC-1/2/3
-  const roadPerLot = 115;          // LF road per lot (reduced)
+  const roadPerLot = 110;          // LF road per lot (aggressive reduction)
   const paveWidth = 24;
   const pavingEfficiencyFactor = 0.82; // accounts for layout efficiency / non-full-width assumptions
   const curbCoverageFactor = 0.72;     // not all road length gets full curb both sides
@@ -1196,11 +1196,11 @@ function autoEstimate() {
   const siteLength = siteWidth * 2;
   const perimeterLF = Math.round((siteWidth + siteLength) * 2);
 
-  const stormPipeLF = Math.round(totalRoadLF * 0.85);
+  const stormPipeLF = Math.round(totalRoadLF * 0.50);
   const inlets = Math.max(4, Math.round(totalRoadLF / 300));
   const stormMH = Math.max(2, Math.round(stormPipeLF / 400));
-  const pipeSplit15 = avgPipe === '15' ? 0.55 : avgPipe === '18' ? 0.25 : 0.10;
-  const pipeSplit18 = avgPipe === '15' ? 0.30 : avgPipe === '18' ? 0.45 : 0.30;
+  const pipeSplit15 = avgPipe === '15' ? 0.70 : avgPipe === '18' ? 0.45 : 0.20;
+  const pipeSplit18 = avgPipe === '15' ? 0.25 : avgPipe === '18' ? 0.45 : 0.40;
   const pipeSplit24 = 1 - pipeSplit15 - pipeSplit18;
 
   const pondExcavCY = hasPond ? Math.round(pondAcres * 2000) : 0;
