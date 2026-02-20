@@ -1,0 +1,7 @@
+Code,Description,Quantity,Unit,Category
+EW-01,Clearing & grubbing,20,AC,Earthwork
+EW-02,Mass excavation/embankment (net),36000,CY,Earthwork
+EW-03,Undercut allowance,1100,CY,Earthwork
+EW-04,Rock excavation (PWR),200,CY,Earthwork
+EW-05,Import select fill,1800,CY,Earthwork
+EW-06,Fine grade building pad,35,EA,Earthwork

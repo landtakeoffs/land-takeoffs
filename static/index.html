@@ -116,6 +116,25 @@
            border-radius: 8px; padding: 12px 20px; z-index: 2000; display: none; font-size: 0.9em; }
   .toast.show { display: block; animation: fadeIn 0.3s; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Development Type Modal */
+  .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                   background: rgba(0,0,0,0.75); z-index: 3000; display: none;
+                   align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+  .modal-overlay.visible { display: flex; }
+  .modal { background: var(--panel); border: 2px solid var(--cyan); border-radius: 16px;
+           padding: 32px; max-width: 600px; width: 90%; animation: modalIn 0.3s; }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  .modal h2 { color: var(--cyan); margin-bottom: 12px; font-size: 1.5em; }
+  .modal p { color: var(--muted); margin-bottom: 24px; font-size: 0.95em; line-height: 1.5; }
+  .modal-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .modal-btn { padding: 20px; border: 2px solid var(--border); border-radius: 12px;
+               background: rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s;
+               text-align: center; }
+  .modal-btn:hover { border-color: var(--cyan); background: rgba(0,212,255,0.08); transform: translateY(-2px); }
+  .modal-btn-icon { font-size: 2.5em; margin-bottom: 12px; }
+  .modal-btn-title { color: var(--text); font-weight: 600; font-size: 1.1em; margin-bottom: 6px; }
+  .modal-btn-desc { color: var(--muted); font-size: 0.85em; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -123,20 +142,14 @@
 <div class="app">
   <header>
     <div style="display:flex;align-items:center;gap:12px;">
-      <svg width="36" height="36" viewBox="0 0 64 64" style="flex-shrink:0;">
-        <defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#00ff88"/></linearGradient></defs>
-        <rect width="64" height="64" rx="14" fill="#0a0a0f" stroke="#1e1e2e" stroke-width="2"/>
-        <path d="M12 44 L24 28 L34 36 L52 18" stroke="url(#logo-g)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M12 44 L24 28 L34 36 L52 18 L52 44 Z" fill="url(#logo-g)" opacity="0.15"/>
-        <circle cx="52" cy="18" r="3.5" fill="#00ff88"/>
-      </svg>
+      <img src="/static/logo.svg" alt="Land Takeoffs" width="36" height="36" style="flex-shrink:0;"/>
       <div>
         <h1 style="font-size:1.3em;line-height:1;">Land Takeoffs</h1>
         <span style="color:var(--muted);font-size:0.75em;letter-spacing:0.5px;">SITE ANALYSIS & ESTIMATION</span>
       </div>
     </div>
-    <a href="/concept-plan" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">📐 Concept Plan</a>
-    <a href="/estimate" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">📋 Bid Estimate</a>
+    <a href="/estimate?type=residential" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">🏘️ Residential</a>
+    <a href="/estimate?type=commercial" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">🏢 Commercial</a>
     <div class="status"><span class="dot"></span>Online</div>
   </header>
 
@@ -173,7 +186,7 @@
         <div style="font-weight:600;color:var(--cyan);margin-bottom:6px;" id="selParcelTitle">—</div>
         <div style="font-size:0.82em;" id="selParcelDetails"></div>
         <button class="btn btn-primary" id="parcelAnalyzeBtn" onclick="analyzeSelectedParcel()" style="margin-top:8px;font-size:0.85em;padding:8px;">
-          ⚡ Analyze This Parcel's Terrain
+          ⚡ Analyze Terrain
         </button>
         <div class="progress-bar" id="parcelProgressBar"><div class="progress-fill" id="parcelProgressFill"></div></div>
       </div>
@@ -223,8 +236,24 @@
         <div class="stat"><span class="stat-label">Net</span><span class="stat-value" id="netVol">—</span></div>
       </div>
 
-      <hr class="divider">
-      <a id="estimateLink" href="/estimate" class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;color:var(--text);" onclick="buildEstimateLink(event)">📋 Open Bid Estimate Builder</a>
+      <div class="card" id="devTypeSelector" style="display:none;">
+        <h3>🚀 Choose Development Type</h3>
+        <p style="font-size:0.85em;color:var(--muted);margin-bottom:12px;line-height:1.4;">
+          Select the development path for this parcel:
+        </p>
+        <button class="btn btn-primary" onclick="selectDevType('residential')" style="margin-bottom:8px;">
+          🏘️ Residential Development
+        </button>
+        <div style="font-size:0.8em;color:var(--muted);margin-bottom:12px;text-align:center;">
+          Takeoff estimate → Lot sales proforma
+        </div>
+        <button class="btn btn-primary" onclick="selectDevType('commercial')" style="background:var(--orange);">
+          🏢 Commercial Development
+        </button>
+        <div style="font-size:0.8em;color:var(--muted);margin-top:8px;text-align:center;">
+          Skip to NNN lease proforma
+        </div>
+      </div>
     </div>
   </div>
 
@@ -244,6 +273,30 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Development Type Selector Modal (deprecated - now in sidebar) -->
+<div class="modal-overlay" id="devTypeModal" style="display:none;">
+  <div class="modal">
+    <h2>✅ Terrain Analysis Complete</h2>
+    <p>Now choose your development type to proceed with cost estimation and financial modeling.</p>
+    
+    <div class="modal-buttons">
+      <div class="modal-btn" onclick="selectDevType('residential')">
+        <div class="modal-btn-icon">🏘️</div>
+        <div class="modal-btn-title">Residential</div>
+        <div class="modal-btn-desc">Takeoff estimate → Lot sales proforma</div>
+      </div>
+      
+      <div class="modal-btn" onclick="selectDevType('commercial')">
+        <div class="modal-btn-icon">🏢</div>
+        <div class="modal-btn-title">Commercial</div>
+        <div class="modal-btn-desc">Skip to NNN lease proforma</div>
+      </div>
+    </div>
+    
+    <button class="btn btn-secondary" onclick="closeDevTypeModal()" style="margin-top:20px;width:100%;">Cancel</button>
+  </div>
+</div>
 
 <script>
 // Map setup — centered on Greenville, SC area
@@ -556,7 +609,7 @@ map.on('click', async function(e) {
     // Popup
     poly.bindPopup(parcelPopup(attr)).openPopup();
 
-    // Auto-run terrain analysis
+    // Auto-run terrain analysis first, then show modal
     analyzeSelectedParcel();
   } catch (err) {
     console.error('Identify error:', err);
@@ -599,11 +652,28 @@ function analyzeSelectedParcel() {
   setTimeout(() => fill.style.width = '70%', 2000);
 
   const b = selectedParcelData._bounds;
-  runAnalysisWithCoords(b.getSouth(), b.getNorth(), b.getWest(), b.getEast()).finally(() => {
+  runAnalysisWithCoords(b.getSouth(), b.getNorth(), b.getWest(), b.getEast()).then(() => {
     btn.disabled = false;
-    btn.innerHTML = '⚡ Analyze This Parcel\'s Terrain';
+    btn.innerHTML = '✅ Analysis Complete';
     fill.style.width = '100%';
     setTimeout(() => fill.style.width = '0%', 1000);
+    
+    // Show dev type selector in sidebar
+    setTimeout(() => {
+      document.getElementById('devTypeSelector').style.display = 'block';
+      // Scroll to it
+      document.getElementById('devTypeSelector').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 600);
+  }).catch(err => {
+    console.error('Analysis failed:', err);
+    btn.disabled = false;
+    btn.innerHTML = '⚠️ Analysis Failed';
+    fill.style.width = '0%';
+    showToast('⚠️ Analysis failed, but you can still proceed');
+    // Show selector anyway
+    setTimeout(() => {
+      document.getElementById('devTypeSelector').style.display = 'block';
+    }, 500);
   });
 }
 
@@ -761,6 +831,64 @@ function analyzeParcel(pin) {
       }
     }
   });
+}
+
+// ---- Development Type Modal ----
+function showDevTypeModal() {
+  if (!selectedParcelData) {
+    showToast('⚠️ Please select a parcel first');
+    return;
+  }
+  document.getElementById('devTypeModal').classList.add('visible');
+}
+
+function closeDevTypeModal() {
+  document.getElementById('devTypeModal').classList.remove('visible');
+}
+
+function selectDevType(type) {
+  if (!selectedParcelData) {
+    showToast('⚠️ No parcel selected');
+    return;
+  }
+  
+  // Hide the selector buttons
+  document.getElementById('devTypeSelector').style.display = 'none';
+  
+  // Store parcel data for next page
+  const parcelInfo = {
+    pin: selectedParcelData.PIN || 'Unknown',
+    owner: selectedParcelData.OWNER || selectedParcelData.OWNERNAME || selectedParcelData.OWNAM1 || 'Unknown',
+    address: selectedParcelData.ADDRESS || selectedParcelData.SITEADDR || [selectedParcelData.STRNUM, selectedParcelData.LOCATE].filter(Boolean).join(' ') || '',
+    acres: selectedParcelData.GIS_ACRES || selectedParcelData.ACRES || selectedParcelData.CALCACRES || 0,
+    bounds: selectedParcelData._bounds ? {
+      south: selectedParcelData._bounds.getSouth(),
+      north: selectedParcelData._bounds.getNorth(),
+      west: selectedParcelData._bounds.getWest(),
+      east: selectedParcelData._bounds.getEast()
+    } : null
+  };
+  
+  sessionStorage.setItem('selectedParcel', JSON.stringify(parcelInfo));
+  sessionStorage.setItem('devType', type);
+  
+  // Store terrain analysis results (already completed)
+  const results = {
+    buildable_pct: document.getElementById('buildablePct')?.textContent || '0%',
+    cut_volume: document.getElementById('cutVol')?.textContent || '0',
+    fill_volume: document.getElementById('fillVol')?.textContent || '0',
+    slope_avg: document.getElementById('slopeAvg')?.textContent || '0%',
+    elevation_range: document.getElementById('elevRange')?.textContent || '0'
+  };
+  sessionStorage.setItem('terrainResults', JSON.stringify(results));
+  
+  // Route based on type
+  if (type === 'residential') {
+    window.location.href = '/unified?type=residential';
+  } else if (type === 'commercial') {
+    // Go straight to commercial proforma
+    window.location.href = 'https://web-production-da5e4.up.railway.app';
+  }
 }
 </script>
 </body>

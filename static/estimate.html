@@ -114,13 +114,7 @@
 
 <header>
   <div style="display:flex;align-items:center;gap:12px;">
-    <svg width="32" height="32" viewBox="0 0 64 64" style="flex-shrink:0;">
-      <defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#00ff88"/></linearGradient></defs>
-      <rect width="64" height="64" rx="14" fill="#0a0a0f" stroke="#1e1e2e" stroke-width="2"/>
-      <path d="M12 44 L24 28 L34 36 L52 18" stroke="url(#logo-g)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M12 44 L24 28 L34 36 L52 18 L52 44 Z" fill="url(#logo-g)" opacity="0.15"/>
-      <circle cx="52" cy="18" r="3.5" fill="#00ff88"/>
-    </svg>
+    <img src="/static/logo.svg" alt="Land Takeoffs" width="32" height="32" style="flex-shrink:0;"/>
     <h1>Land Takeoffs</h1>
   </div>
   <a href="/">← Back to Map</a>
@@ -235,6 +229,9 @@
   <button class="btn btn-primary" onclick="downloadEstimate()">
     📥 Download .xlsx
   </button>
+  <button class="btn btn-primary" onclick="goToProforma()" style="background:var(--green);" id="proformaBtn">
+    💰 Go to Proforma →
+  </button>
 </div>
 
 <div style="max-width:1100px;margin:0 auto;padding:12px 24px 24px;">
@@ -252,20 +249,34 @@
 let sections = {};
 let activeSection = null;
 
+// Track if template is loaded
+let templateLoaded = false;
+let templateLoadPromise = null;
+
 // Load template from API
 async function init() {
-  try {
-    const resp = await fetch('/api/estimate/template');
-    sections = await resp.json();
-    renderTabs();
-    renderSections();
-    // Activate first tab
-    const firstKey = Object.keys(sections)[0];
-    activateTab(firstKey);
-    updateSummary();
-  } catch (err) {
-    showToast('❌ Failed to load template: ' + err.message);
-  }
+  if (templateLoaded) return Promise.resolve();
+  if (templateLoadPromise) return templateLoadPromise;
+  
+  templateLoadPromise = (async () => {
+    try {
+      const resp = await fetch('/api/estimate/template');
+      sections = await resp.json();
+      templateLoaded = true;
+      renderTabs();
+      renderSections();
+      // Activate first tab
+      const firstKey = Object.keys(sections)[0];
+      activateTab(firstKey);
+      updateSummary();
+      console.log('🔵 Template loaded, sections available:', Object.keys(sections));
+    } catch (err) {
+      showToast('❌ Failed to load template: ' + err.message);
+      throw err;
+    }
+  })();
+  
+  return templateLoadPromise;
 }
 
 function renderTabs() {
@@ -543,6 +554,38 @@ function recalcLots() {
 // Read URL params from map page (parcel data)
 function loadParcelFromURL() {
   const params = new URLSearchParams(window.location.search);
+  
+  // First try sessionStorage (from map flow)
+  const parcelData = sessionStorage.getItem('selectedParcel');
+  if (parcelData) {
+    try {
+      const parcel = JSON.parse(parcelData);
+      if (parcel.acres) {
+        document.getElementById('siteAcres').value = parseFloat(parcel.acres).toFixed(2);
+      }
+      if (parcel.address) {
+        document.getElementById('projectName').value = parcel.address;
+      }
+      
+      // Show terrain results if available
+      const terrainResults = sessionStorage.getItem('terrainResults');
+      if (terrainResults) {
+        const results = JSON.parse(terrainResults);
+        console.log('Terrain analysis results:', results);
+        // Could display this in a banner or info panel
+      }
+      
+      recalcLots();
+      calcOpen = true;
+      document.getElementById('calcBody').style.display = 'block';
+      document.getElementById('calcToggle').textContent = '▲';
+      return;
+    } catch (e) {
+      console.error('Failed to load parcel from session:', e);
+    }
+  }
+  
+  // Fallback to URL params
   if (params.has('acres')) {
     document.getElementById('siteAcres').value = parseFloat(params.get('acres')).toFixed(2);
   }
@@ -551,7 +594,6 @@ function loadParcelFromURL() {
   }
   if (params.has('acres')) {
     recalcLots();
-    // Auto-open the calculator if we have parcel data
     calcOpen = true;
     document.getElementById('calcBody').style.display = 'block';
     document.getElementById('calcToggle').textContent = '▲';
@@ -746,6 +788,102 @@ function autoEstimate() {
   const grand = Object.values(sections).flat().reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
   const perLot = Math.round(grand / lots);
   showToast(`⚡ ${lots}-lot estimate: ${formatMoney(grand)} total (${formatMoney(perLot)}/lot) — review & adjust`);
+}
+
+async function goToProforma() {
+  console.log('🔵 ESTIMATE: goToProforma called');
+  
+  const acres = parseFloat(document.getElementById('siteAcres')?.value) || 0;
+  
+  // If no acres, can't proceed
+  if (acres <= 0) {
+    alert('Please enter site acreage first');
+    return;
+  }
+  
+  // CRITICAL: Wait for template to load
+  if (!templateLoaded) {
+    console.log('🔵 ESTIMATE: Template not loaded yet, waiting...');
+    try {
+      await init();
+    } catch (e) {
+      alert('Failed to load estimate template: ' + e.message);
+      return;
+    }
+  }
+  
+  console.log('🔵 ESTIMATE: Template loaded, sections available:', Object.keys(sections).length, 'categories');
+  
+  // Check if estimate has been generated (has quantities)
+  const hasEstimate = Object.values(sections).flat().some(i => (i.Qty || 0) > 0);
+  
+  if (!hasEstimate) {
+    console.log('⚠️ ESTIMATE: No quantities found, auto-generating estimate...');
+    // Auto-generate using the calculator
+    autoEstimate();
+    // Let autoEstimate complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log('🔵 ESTIMATE: autoEstimate complete, now saving data...');
+    saveProformaData();
+    return;
+  }
+  
+  // Estimate already generated, save it
+  saveProformaData();
+}
+
+function saveProformaData() {
+  console.log('🔵 ESTIMATE: saveProformaData() called');
+  console.log('🔵 ESTIMATE: sections object has keys:', Object.keys(sections));
+  
+  // DEBUG: Log each section
+  Object.entries(sections).forEach(([name, items]) => {
+    const total = items.reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+    const itemsWithQty = items.filter(i => (i.Qty || 0) > 0);
+    console.log(`  ${name}: $${total.toLocaleString()} (${itemsWithQty.length}/${items.length} items with qty)`);
+  });
+  
+  const grandTotal = Object.values(sections).flat()
+    .reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+  
+  const acres = parseFloat(document.getElementById('siteAcres')?.value) || 0;
+  const lots = parseInt(document.getElementById('calcNumLots')?.textContent) || 0;
+  
+  // Build data for each of the 8 categories
+  const estimateData = {
+    grandTotal: grandTotal,
+    acres: acres,
+    lots: lots,
+    perLot: lots > 0 ? Math.round(grandTotal / lots) : 0,
+    sections: Object.entries(sections).map(([name, items]) => {
+      const total = items.reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+      return { name, total };
+    })
+  };
+  
+  console.log('🔵 ESTIMATE: Estimate data ready:', estimateData);
+  console.log('🔵 ESTIMATE: Categories with totals:');
+  estimateData.sections.forEach(s => console.log(`  ${s.name}: $${s.total.toLocaleString()}`));
+  
+  // Save to localStorage
+  localStorage.setItem('estimateData', JSON.stringify(estimateData));
+  console.log('🔵 ESTIMATE: ✅ Saved to localStorage');
+  
+  // Also save to sessionStorage as backup
+  sessionStorage.setItem('estimateData', JSON.stringify(estimateData));
+  
+  // Redirect to proforma
+  let proformaURL = '';
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    proformaURL = 'http://localhost:5003/';
+  } else if (window.location.hostname.includes('railway.app')) {
+    proformaURL = '/residential-proforma';
+  } else {
+    proformaURL = `${window.location.protocol}//${window.location.hostname}:5003/`;
+  }
+  
+  console.log('🔵 ESTIMATE: Redirecting to proforma...');
+  window.location.href = proformaURL;
 }
 
 init();

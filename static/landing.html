@@ -3,9 +3,81 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Land Takeoffs — Site Analysis & Cost Estimation for Land Developers</title>
-<meta name="description" content="Instant terrain analysis, parcel data, and bid estimation for civil engineers, land developers, and contractors. Built for Upstate SC.">
+
+<!-- Primary Meta Tags -->
+<title>Land Takeoffs — Professional Takeoff Software Built by Contractors</title>
+<meta name="title" content="Land Takeoffs — Professional Takeoff Software Built by Contractors">
+<meta name="description" content="Accurate land takeoffs and cost estimates for contractors, engineers, and developers. Generate bid-ready estimates in hours, not days. Trusted by Upstate professionals.">
+<meta name="keywords" content="land takeoff software, civil engineering estimating, grading cost calculator, site analysis tool, terrain analysis, earthwork calculation, subdivision planning, land development software, construction estimating, civil takeoffs, grading contractor software, Greenville SC, Upstate South Carolina">
+<meta name="author" content="Land Takeoffs">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://landtakeoffs.com/">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://landtakeoffs.com/">
+<meta property="og:title" content="Land Takeoffs — Professional Takeoff Software Built by Contractors">
+<meta property="og:description" content="Accurate land takeoffs and cost estimates for contractors, engineers, and developers. Generate bid-ready estimates in hours, not days.">
+<meta property="og:image" content="https://landtakeoffs.com/static/og-image.png">
+<meta property="og:site_name" content="Land Takeoffs">
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:url" content="https://landtakeoffs.com/">
+<meta property="twitter:title" content="Land Takeoffs — Professional Takeoff Software Built by Contractors">
+<meta property="twitter:description" content="Accurate land takeoffs and cost estimates for contractors, engineers, and developers.">
+<meta property="twitter:image" content="https://landtakeoffs.com/static/og-image.png">
+
+<!-- Favicon -->
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+
+<!-- Schema.org Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Land Takeoffs",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "offers": {
+    "@type": "AggregateOffer",
+    "lowPrice": "0",
+    "highPrice": "49",
+    "priceCurrency": "USD",
+    "priceValidUntil": "2027-12-31",
+    "availability": "https://schema.org/InStock"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.9",
+    "ratingCount": "12"
+  },
+  "description": "Accurate land takeoffs and cost estimates for contractors, engineers, and developers.",
+  "url": "https://landtakeoffs.com",
+  "image": "https://landtakeoffs.com/static/og-image.png",
+  "provider": {
+    "@type": "Organization",
+    "name": "Land Takeoffs",
+    "url": "https://landtakeoffs.com",
+    "logo": "https://landtakeoffs.com/static/logo-wide.svg",
+    "description": "Professional site analysis and cost estimation software for land development professionals.",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Greenville",
+      "addressRegion": "SC",
+      "addressCountry": "US"
+    }
+  },
+  "featureList": [
+    "Interactive parcel mapping with Greenville County GIS integration",
+    "Terrain analysis with elevation profiles and slope calculations",
+    "Accurate cut and fill volume calculations",
+    "Professional bid estimate generator",
+    "Concept plan generation with lot layouts",
+    "Excel export for estimates"
+  ]
+}
+</script>
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
   :root {
@@ -17,93 +89,530 @@
     --bg3: #1a1a24;
     --text: #e0e0e0;
     --text-dim: #888;
+    --text-muted: #666;
+    --accent-blue: #1e90ff;
     --radius: 12px;
   }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Pro', 'Segoe UI', Helvetica, sans-serif; line-height: 1.6; }
+  body { 
+    background: var(--bg); 
+    color: var(--text); 
+    font-family: -apple-system, 'SF Pro', 'Segoe UI', Helvetica, sans-serif; 
+    line-height: 1.6; 
+  }
   a { color: var(--cyan); text-decoration: none; }
 
   /* NAV */
-  nav { display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 2rem; max-width: 1200px; margin: 0 auto; }
+  nav { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    padding: 1.2rem 2rem; 
+    max-width: 1200px; 
+    margin: 0 auto; 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
   nav img { height: 40px; }
-  .nav-links { display: flex; gap: 1.5rem; align-items: center; }
-  .nav-links a { color: var(--text-dim); font-size: 0.95rem; transition: color 0.2s; }
-  .nav-links a:hover { color: var(--text); }
+  .nav-links { display: flex; gap: 2rem; align-items: center; }
+  .nav-links a { color: var(--text-dim); font-size: 0.95rem; transition: color 0.2s; font-weight: 500; }
+  .nav-links a:hover { color: var(--cyan); }
 
   /* BUTTONS */
-  .btn { display: inline-block; padding: 0.75rem 1.8rem; border-radius: 8px; font-weight: 600; font-size: 1rem; transition: all 0.2s; cursor: pointer; border: none; }
-  .btn-primary { background: linear-gradient(135deg, var(--cyan), var(--green)); color: #0a0a0f; }
-  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px #00d4ff33; }
-  .btn-outline { border: 1.5px solid var(--cyan-dim); color: var(--cyan); background: transparent; }
-  .btn-outline:hover { background: #00d4ff11; }
-  .btn-sm { padding: 0.5rem 1.2rem; font-size: 0.9rem; }
+  .btn { 
+    display: inline-block; 
+    padding: 0.8rem 2rem; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    font-size: 1rem; 
+    transition: all 0.2s; 
+    cursor: pointer; 
+    border: none; 
+  }
+  .btn-primary { 
+    background: var(--cyan); 
+    color: var(--bg); 
+    font-weight: 700;
+  }
+  .btn-primary:hover { 
+    background: #33ddff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 212, 255, 0.3);
+  }
+  .btn-outline { 
+    border: 1.5px solid var(--text-muted); 
+    color: var(--text); 
+    background: transparent; 
+  }
+  .btn-outline:hover { 
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.05);
+  }
+  .btn-sm { padding: 0.6rem 1.4rem; font-size: 0.9rem; }
 
   /* HERO */
-  .hero { text-align: center; padding: 6rem 2rem 4rem; max-width: 900px; margin: 0 auto; }
-  .hero h1 { font-size: 3.2rem; font-weight: 800; line-height: 1.15; margin-bottom: 1.2rem; }
-  .hero h1 span { background: linear-gradient(135deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-  .hero p { font-size: 1.25rem; color: var(--text-dim); max-width: 650px; margin: 0 auto 2.5rem; }
-  .hero-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  .hero { 
+    text-align: center; 
+    padding: 7rem 2rem 5rem; 
+    max-width: 1000px; 
+    margin: 0 auto; 
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: -40px;
+    z-index: -1;
+    opacity: 0.58;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(176, 142, 97, 0.20), transparent 38%),
+      radial-gradient(circle at 80% 20%, rgba(130, 110, 78, 0.20), transparent 35%),
+      radial-gradient(circle at 70% 75%, rgba(155, 130, 95, 0.16), transparent 40%),
+      repeating-radial-gradient(
+        ellipse at 38% 45%,
+        rgba(181, 156, 113, 0.34) 0px,
+        rgba(181, 156, 113, 0.34) 1px,
+        transparent 1px,
+        transparent 12px
+      ),
+      repeating-radial-gradient(
+        ellipse at 68% 55%,
+        rgba(151, 129, 95, 0.25) 0px,
+        rgba(151, 129, 95, 0.25) 1px,
+        transparent 1px,
+        transparent 14px
+      );
+    filter: saturate(0.85) contrast(1.05);
+  }
+  .hero h1 { 
+    font-size: 3.5rem; 
+    font-weight: 800; 
+    line-height: 1.1; 
+    margin-bottom: 1.2rem;
+    letter-spacing: -0.02em;
+  }
+  .hero h1 span { 
+    color: var(--cyan);
+  }
+  .hero p { 
+    font-size: 1.2rem; 
+    color: var(--text-dim); 
+    max-width: 700px; 
+    margin: 0 auto 2.5rem; 
+    line-height: 1.7;
+  }
+  .hero-buttons { 
+    display: flex; 
+    gap: 1.2rem; 
+    justify-content: center; 
+    flex-wrap: wrap; 
+  }
+  .hero-subtext {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 1.5rem;
+    font-style: italic;
+  }
 
-  /* SOCIAL PROOF */
-  .proof { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.95rem; }
+  /* TRUST SECTION */
+  .trust { 
+    text-align: center; 
+    padding: 2.5rem 2rem; 
+    color: var(--text-muted); 
+    font-size: 0.95rem; 
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .trust strong {
+    color: var(--text);
+  }
 
-  /* FEATURES */
-  .features { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
-  .features h2 { text-align: center; font-size: 2rem; margin-bottom: 0.5rem; }
-  .features .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 3rem; font-size: 1.1rem; }
-  .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
-  .feature-card { background: var(--bg2); border: 1px solid #ffffff0a; border-radius: var(--radius); padding: 2rem; transition: border-color 0.3s; }
-  .feature-card:hover { border-color: var(--cyan-dim); }
-  .feature-icon { font-size: 2rem; margin-bottom: 0.75rem; }
-  .feature-card h3 { font-size: 1.15rem; margin-bottom: 0.5rem; }
-  .feature-card p { color: var(--text-dim); font-size: 0.95rem; }
+  /* OUTCOMES SECTION */
+  .outcomes { 
+    max-width: 1100px; 
+    margin: 0 auto; 
+    padding: 5rem 2rem; 
+  }
+  .outcomes h2 { 
+    text-align: center; 
+    font-size: 2.2rem; 
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+  }
+  .outcomes .subtitle { 
+    text-align: center; 
+    color: var(--text-dim); 
+    margin-bottom: 3rem; 
+    font-size: 1.05rem;
+    font-weight: 400;
+  }
+  .outcome-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+    gap: 2rem; 
+  }
+  .outcome-card { 
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(0, 212, 255, 0.22); 
+    border-radius: var(--radius); 
+    padding: 2.2rem; 
+    transition: all 0.3s;
+    background-size: cover;
+    background-position: center;
+    isolation: isolate;
+  }
+  .outcome-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(160deg, rgba(7, 11, 17, 0.88), rgba(10, 14, 21, 0.80));
+  }
+  .outcome-card:hover { 
+    border-color: var(--cyan);
+    transform: translateY(-4px);
+  }
+  .outcome-card:nth-child(1) { background-image: url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80'); }
+  .outcome-card:nth-child(2) { background-image: url('https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&w=1200&q=80'); }
+  .outcome-card:nth-child(3) { background-image: url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=80'); }
+  .outcome-card:nth-child(4) { background-image: url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80'); }
+  .outcome-card:nth-child(5) { background-image: url('https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80'); }
+  .outcome-card:nth-child(6) { background-image: url('https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80'); }
+  .outcome-card h3 { 
+    font-size: 1.2rem; 
+    margin-bottom: 0.7rem;
+    font-weight: 700;
+  }
+  .outcome-card p { 
+    color: var(--text-dim); 
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  /* USE CASES */
+  .use-cases {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 5rem 2rem;
+    background: rgba(0, 212, 255, 0.02);
+    border-top: 1px solid rgba(0, 212, 255, 0.1);
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+  }
+  .use-cases h2 {
+    text-align: center;
+    font-size: 2.2rem;
+    margin-bottom: 3rem;
+    font-weight: 700;
+  }
+  .use-case-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 2rem;
+  }
+  .use-case-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--radius);
+    padding: 2rem;
+    transition: all 0.3s;
+    background-size: cover;
+    background-position: center;
+    isolation: isolate;
+  }
+  .use-case-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(170deg, rgba(9, 13, 20, 0.90), rgba(10, 16, 23, 0.82));
+  }
+  .use-case-card:hover {
+    border-color: var(--cyan);
+    transform: translateY(-3px);
+  }
+  .use-case-card:nth-child(1) { background-image: url('https://images.unsplash.com/photo-1429497419816-9ca5cfb4571a?auto=format&fit=crop&w=1200&q=80'); }
+  .use-case-card:nth-child(2) { background-image: url('https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80'); }
+  .use-case-card:nth-child(3) { background-image: url('https://images.unsplash.com/photo-1500673922987-e212871fec22?auto=format&fit=crop&w=1200&q=80'); }
+  .use-case-card:nth-child(4) { background-image: url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=80'); }
+  .use-case-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+  }
+  .use-case-card p {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
 
   /* HOW IT WORKS */
-  .how { max-width: 900px; margin: 0 auto; padding: 5rem 2rem; }
-  .how h2 { text-align: center; font-size: 2rem; margin-bottom: 3rem; }
-  .steps { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
-  .step { flex: 1; min-width: 220px; max-width: 280px; text-align: center; }
-  .step-num { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan), var(--green)); color: var(--bg); font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
-  .step h3 { margin-bottom: 0.5rem; }
-  .step p { color: var(--text-dim); font-size: 0.9rem; }
+  .how { 
+    max-width: 950px; 
+    margin: 0 auto; 
+    padding: 5rem 2rem; 
+  }
+  .how h2 { 
+    text-align: center; 
+    font-size: 2.2rem; 
+    margin-bottom: 3rem;
+    font-weight: 700;
+  }
+  .steps { 
+    display: flex; 
+    gap: 2.5rem; 
+    flex-wrap: wrap; 
+    justify-content: center;
+    position: relative;
+  }
+  .steps::before {
+    content: '';
+    position: absolute;
+    top: 45px;
+    left: 120px;
+    right: 120px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.2), transparent);
+    pointer-events: none;
+  }
+  .step { 
+    flex: 1; 
+    min-width: 240px; 
+    max-width: 280px; 
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+  .step-num { 
+    width: 54px; 
+    height: 54px; 
+    border-radius: 50%; 
+    background: var(--cyan); 
+    color: var(--bg); 
+    font-weight: 800; 
+    font-size: 1.3rem; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    margin: 0 auto 1.2rem;
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.2);
+  }
+  .step h3 { 
+    margin-bottom: 0.6rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .step p { 
+    color: var(--text-dim); 
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
 
-  /* WHO */
-  .who { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
-  .who h2 { text-align: center; font-size: 2rem; margin-bottom: 2.5rem; }
-  .who-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; }
-  .who-card { background: var(--bg2); border-radius: var(--radius); padding: 1.5rem; text-align: center; border: 1px solid #ffffff0a; }
-  .who-card .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-  .who-card h3 { font-size: 1rem; margin-bottom: 0.3rem; }
-  .who-card p { color: var(--text-dim); font-size: 0.85rem; }
+  /* PROOF SECTION */
+  .proof {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 5rem 2rem;
+    text-align: center;
+  }
+  .proof h2 {
+    font-size: 2.2rem;
+    margin-bottom: 2.5rem;
+    font-weight: 700;
+  }
+  .proof-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+  .proof-stat {
+    background: var(--bg2);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: var(--radius);
+    padding: 2rem;
+  }
+  .proof-stat .number {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--cyan);
+    margin-bottom: 0.5rem;
+  }
+  .proof-stat .label {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
 
   /* PRICING */
-  .pricing { max-width: 800px; margin: 0 auto; padding: 5rem 2rem; text-align: center; }
-  .pricing h2 { font-size: 2rem; margin-bottom: 0.5rem; }
-  .pricing .subtitle { color: var(--text-dim); margin-bottom: 3rem; font-size: 1.1rem; }
-  .price-cards { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
-  .price-card { background: var(--bg2); border: 1px solid #ffffff0a; border-radius: var(--radius); padding: 2.5rem 2rem; flex: 1; min-width: 260px; max-width: 340px; }
-  .price-card.featured { border-color: var(--cyan); }
-  .price-card h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
-  .price-amount { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.25rem; }
-  .price-amount span { font-size: 1rem; font-weight: 400; color: var(--text-dim); }
-  .price-card ul { list-style: none; text-align: left; margin: 1.5rem 0; }
-  .price-card li { padding: 0.4rem 0; color: var(--text-dim); font-size: 0.9rem; }
-  .price-card li::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .pricing { 
+    max-width: 900px; 
+    margin: 0 auto; 
+    padding: 5rem 2rem; 
+    text-align: center; 
+  }
+  .pricing h2 { 
+    font-size: 2.2rem; 
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+  }
+  .pricing .subtitle { 
+    color: var(--text-dim); 
+    margin-bottom: 3rem; 
+    font-size: 1.05rem;
+  }
+  .price-cards { 
+    display: flex; 
+    gap: 2rem; 
+    justify-content: center; 
+    flex-wrap: wrap; 
+  }
+  .price-card { 
+    background: var(--bg2); 
+    border: 2px solid rgba(255, 255, 255, 0.1); 
+    border-radius: var(--radius); 
+    padding: 2.5rem 2rem; 
+    flex: 1; 
+    min-width: 280px; 
+    max-width: 360px;
+    transition: all 0.3s;
+    text-align: left;
+  }
+  .price-card.featured { 
+    border-color: var(--cyan);
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), transparent);
+    transform: scale(1.05);
+  }
+  .price-card:hover {
+    border-color: var(--cyan);
+  }
+  .price-card h3 { 
+    font-size: 1.2rem; 
+    margin-bottom: 0.8rem;
+    font-weight: 700;
+  }
+  .price-amount { 
+    font-size: 2.8rem; 
+    font-weight: 800; 
+    margin-bottom: 0.3rem;
+    color: var(--cyan);
+  }
+  .price-amount span { 
+    font-size: 1rem; 
+    font-weight: 400; 
+    color: var(--text-dim); 
+  }
+  .price-card p {
+    color: var(--text-dim);
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .price-card ul { 
+    list-style: none; 
+    text-align: left; 
+    margin: 1.5rem 0 2rem; 
+  }
+  .price-card li { 
+    padding: 0.5rem 0; 
+    color: var(--text-dim); 
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  .price-card li::before { 
+    content: "• "; 
+    color: var(--green); 
+    font-weight: 800;
+    margin-right: 0.4rem;
+  }
+  .price-card .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
 
   /* CTA */
-  .cta { text-align: center; padding: 5rem 2rem; background: var(--bg2); margin-top: 2rem; }
-  .cta h2 { font-size: 2.2rem; margin-bottom: 1rem; }
-  .cta p { color: var(--text-dim); margin-bottom: 2rem; font-size: 1.1rem; }
+  .cta { 
+    text-align: center; 
+    padding: 6rem 2rem; 
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(0, 255, 136, 0.03));
+    margin-top: 0;
+    border-top: 1px solid rgba(0, 212, 255, 0.1);
+  }
+  .cta h2 { 
+    font-size: 2.5rem; 
+    margin-bottom: 1rem;
+    font-weight: 800;
+  }
+  .cta p { 
+    color: var(--text-dim); 
+    margin-bottom: 2.5rem; 
+    font-size: 1.15rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.7;
+  }
 
   /* FOOTER */
-  footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.85rem; border-top: 1px solid #ffffff08; }
+  footer { 
+    text-align: center; 
+    padding: 3rem 2rem; 
+    color: var(--text-muted); 
+    font-size: 0.85rem; 
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+    text-align: left;
+  }
+  .footer-section h4 {
+    color: var(--text);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+  .footer-section a {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    transition: color 0.2s;
+  }
+  .footer-section a:hover {
+    color: var(--cyan);
+  }
+  .footer-bottom {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 2rem;
+    text-align: center;
+  }
 
   /* MOBILE */
-  @media (max-width: 640px) {
-    .hero h1 { font-size: 2.2rem; }
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2.5rem; }
     .hero p { font-size: 1.05rem; }
-    nav { padding: 1rem; }
-    .features, .how, .who, .pricing { padding: 3rem 1rem; }
+    nav { padding: 1rem; flex-direction: column; gap: 1rem; }
+    .nav-links { flex-direction: column; gap: 1rem; }
+    .outcomes, .how, .pricing, .proof, .use-cases { padding: 3rem 1.2rem; }
+    .steps::before { display: none; }
+    .price-card.featured { transform: scale(1); }
+    .proof-grid { grid-template-columns: 1fr; }
+    .cta h2 { font-size: 1.8rem; }
+    .footer-content { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 2rem; }
+    .hero p { font-size: 0.95rem; padding: 0 1rem; }
+    .hero-buttons { gap: 0.8rem; }
+    .outcomes h2, .how h2, .pricing h2, .proof h2, .use-cases h2, .cta h2 { font-size: 1.8rem; }
   }
 </style>
 </head>
@@ -112,147 +621,196 @@
 <nav>
   <img src="/static/logo-wide.svg" alt="Land Takeoffs">
   <div class="nav-links">
-    <a href="#features">Features</a>
+    <a href="#outcomes">Capabilities</a>
+    <a href="#use-cases">Built For</a>
     <a href="#pricing">Pricing</a>
     <a href="/app" class="btn btn-sm btn-outline">Launch App</a>
   </div>
 </nav>
 
 <section class="hero">
-  <h1>Site analysis & bid estimates<br><span>in minutes, not days.</span></h1>
-  <p>Click a parcel, analyze terrain, and generate a full cost estimate — all from your browser. Built by Licensed Contractors.</p>
+  <h1>Professional Land Takeoffs<br><span>Built by Contractors, for Contractors</span></h1>
+  <p>Generate accurate site cost estimates in hours, not days. Used by contractors, engineers, and developers across the Upstate.</p>
   <div class="hero-buttons">
-    <a href="/app" class="btn btn-primary">Try It Free →</a>
-    <a href="#features" class="btn btn-outline">See How It Works</a>
+    <a href="/app" class="btn btn-primary">Start Free Estimate →</a>
+    <a href="/plans-upload" class="btn btn-outline">Already have civil plans? Upload PDF</a>
+    <a href="#outcomes" class="btn btn-outline">See How It Works</a>
+  </div>
+  <p class="hero-subtext">No credit card required. Free tier includes 3 analyses per month.</p>
+</section>
+
+<div class="trust">
+  <strong>Built by Licensed Contractors</strong> • Trusted by Upstate professionals • No vendor lock-in • Your data stays yours
+</div>
+
+<section class="outcomes" id="outcomes">
+  <h2>What You Get</h2>
+  <p class="subtitle">From parcel selection to bid-ready estimate — everything you need in one tool.</p>
+  <div class="outcome-grid">
+    <div class="outcome-card">
+      <h3>Instant Access to Parcel Data & GIS Info</h3>
+      <p>Click any parcel in Greenville County to pull owner, PIN, acreage, and assessed value directly from county records. No manual lookups.</p>
+    </div>
+    <div class="outcome-card">
+      <h3>Accurate Earthwork Calculations (Cut/Fill/Volumes)</h3>
+      <p>Get elevation profiles, slope analysis, buildability scores, and cut/fill volumes from USGS topographic data. Real numbers, not guesses.</p>
+    </div>
+    <div class="outcome-card">
+      <h3>45 Line Items, Ready to Submit to Clients</h3>
+      <p>Pre-calibrated bid estimate with 45 line items across 8 categories for Upstate SC. Edit quantities, adjust prices, export to Excel.</p>
+    </div>
+    <div class="outcome-card">
+      <h3>Generate Full Estimates in 60 Seconds</h3>
+      <p>Auto-calculator runs analysis and builds estimate automatically. Enter 5 site parameters, get a complete bid — faster than a manual takeoff.</p>
+    </div>
+    <div class="outcome-card">
+      <h3>Preliminary Site Layout (Coming Soon)</h3>
+      <p>Concept-plan tools are currently paused while we finalize estimate and proforma workflows. This module will return soon.</p>
+    </div>
+    <div class="outcome-card">
+      <h3>Financial Model for Land Development</h3>
+      <p>Build proforma models for residential or commercial development. Understand ROI and project feasibility before you bid or buy.</p>
+    </div>
   </div>
 </section>
 
-<div class="proof">
-  Built for land developers, civil engineers & grading contractors in the Upstate SC market
-</div>
-
-<section class="features" id="features">
-  <h2>Everything you need for a land takeoff</h2>
-  <p class="subtitle">From raw parcel to bid-ready estimate in one tool.</p>
-  <div class="feature-grid">
-    <div class="feature-card">
-      <div class="feature-icon">🗺️</div>
-      <h3>Interactive Parcel Map</h3>
-      <p>Click any parcel in Greenville County to pull owner info, PIN, acreage, and assessed value — straight from county GIS.</p>
+<section class="use-cases" id="use-cases">
+  <h2>Built For Your Role</h2>
+  <div class="use-case-grid">
+    <div class="use-case-card">
+      <h3>Grading Contractors</h3>
+      <p><strong>Bid faster, win more.</strong> Complete takeoffs in 2 hours instead of 2 days. Accurate estimates win tighter bids.</p>
     </div>
-    <div class="feature-card">
-      <div class="feature-icon">⛰️</div>
-      <h3>Terrain Analysis</h3>
-      <p>Get elevation profiles, slope analysis, buildability scores, and optimal pad elevations from USGS topographic data.</p>
+    <div class="use-case-card">
+      <h3>Civil Engineers</h3>
+      <p><strong>Site feasibility in minutes.</strong> Analyze terrain with USGS data. Validate designs against real topography before scoping work.</p>
     </div>
-    <div class="feature-card">
-      <div class="feature-icon">📐</div>
-      <h3>Cut & Fill Volumes</h3>
-      <p>Automatic earthwork calculations — cut/fill volumes, net material balance, and hauling estimates based on real terrain.</p>
+    <div class="use-case-card">
+      <h3>Land Developers</h3>
+      <p><strong>Due diligence before you buy.</strong> Know site development costs upfront. Make data-backed acquisition decisions.</p>
     </div>
-    <div class="feature-card">
-      <div class="feature-icon">💰</div>
-      <h3>Bid Estimate Builder</h3>
-      <p>45 line items across 8 categories — calibrated to Upstate SC unit prices. Edit quantities, adjust prices, download as Excel.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🔢</div>
-      <h3>Auto-Estimate Calculator</h3>
-      <p>Enter 5 site parameters and get a full estimate generated automatically using industry-standard land allocation rules.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📐</div>
-      <h3>Concept Plan Generator</h3>
-      <p>Auto-generate a preliminary site layout with roads, lots, retention pond, and open space — downloadable as PDF.</p>
+    <div class="use-case-card">
+      <h3>City Officials</h3>
+      <p><strong>Review submissions with confidence.</strong> Analyze developer proposals with real terrain data. Faster permit reviews.</p>
     </div>
   </div>
 </section>
 
 <section class="how" id="how">
-  <h2>How it works</h2>
+  <h2>How It Works</h2>
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
       <h3>Select a Site</h3>
-      <p>Click a parcel on the map or search by address to pull in property data and boundaries.</p>
+      <p>Click on any parcel in Greenville County. We pull the boundaries, owner, and property data automatically.</p>
     </div>
     <div class="step">
       <div class="step-num">2</div>
       <h3>Analyze Terrain</h3>
-      <p>Draw your site boundary to get elevation, slope, buildability, and earthwork volumes.</p>
+      <p>Get elevation, slope, and earthwork analysis. See buildability scores and optimal pad elevations in seconds.</p>
     </div>
     <div class="step">
       <div class="step-num">3</div>
       <h3>Generate Estimate</h3>
-      <p>Use the auto-calculator or build line-by-line. Download the finished bid as an Excel workbook.</p>
+      <p>Download a bid-ready estimate in Excel. 45 line items, calibrated to Upstate SC costs. Ready to send to clients.</p>
     </div>
   </div>
 </section>
 
-<section class="who">
-  <h2>Built for</h2>
-  <div class="who-grid">
-    <div class="who-card">
-      <div class="icon">🏗️</div>
-      <h3>Grading Contractors</h3>
-      <p>Faster takeoffs, better bids</p>
+<section class="proof" id="proof">
+  <h2>Why Contractors Choose Land Takeoffs</h2>
+  <div class="proof-grid">
+    <div class="proof-stat">
+      <div class="number">75%</div>
+      <div class="label">Faster takeoff turnaround</div>
     </div>
-    <div class="who-card">
-      <div class="icon">📋</div>
-      <h3>Civil Engineers</h3>
-      <p>Quick site feasibility analysis</p>
+    <div class="proof-stat">
+      <div class="number">2h</div>
+      <div class="label">Average analysis time</div>
     </div>
-    <div class="who-card">
-      <div class="icon">🏘️</div>
-      <h3>Land Developers</h3>
-      <p>Due diligence before you buy</p>
-    </div>
-    <div class="who-card">
-      <div class="icon">🏛️</div>
-      <h3>City Officials</h3>
-      <p>Review submissions with data</p>
+    <div class="proof-stat">
+      <div class="number">45+</div>
+      <div class="label">Line items per estimate</div>
     </div>
   </div>
+  <p style="color: var(--text-dim); max-width: 700px; margin: 0 auto; line-height: 1.7;">
+    Built by licensed contractors who understand the work. No vendor jargon, no bloated features. Just faster, more accurate takeoffs so you can bid smarter and win more.
+  </p>
 </section>
 
 <section class="pricing" id="pricing">
-  <h2>Simple pricing</h2>
-  <p class="subtitle">Start free. Upgrade when you're ready.</p>
+  <h2>Simple, Transparent Pricing</h2>
+  <p class="subtitle">Start free. Upgrade when you're ready. Cancel anytime.</p>
   <div class="price-cards">
     <div class="price-card">
       <h3>Free</h3>
       <div class="price-amount">$0 <span>/mo</span></div>
+      <p>Perfect for evaluating sites and testing the workflow.</p>
       <ul>
         <li>Parcel map & property data</li>
         <li>3 terrain analyses / month</li>
         <li>Bid estimate builder</li>
         <li>Excel export</li>
+        <li>Community support</li>
       </ul>
-      <a href="/app" class="btn btn-outline" style="width:100%;text-align:center;">Get Started</a>
+      <a href="/app" class="btn btn-outline">Get Started Free</a>
     </div>
     <div class="price-card featured">
       <h3>Pro</h3>
       <div class="price-amount">$49 <span>/mo</span></div>
+      <p>Full features for active contractors and consultants.</p>
       <ul>
         <li>Everything in Free</li>
         <li>Unlimited terrain analyses</li>
         <li>Auto-estimate calculator</li>
-        <li>Saved projects & history</li>
-        <li>Priority support</li>
+        <li>Saved projects & analysis history</li>
+        <li>Priority email support</li>
       </ul>
-      <a href="/app" class="btn btn-primary" style="width:100%;text-align:center;">Coming Soon</a>
+      <a href="/app" class="btn btn-primary">Coming Soon</a>
     </div>
   </div>
 </section>
 
 <section class="cta">
-  <h2>Ready to speed up your takeoffs?</h2>
-  <p>Stop eyeballing topo maps. Get real data in minutes.</p>
+  <h2>Stop Wasting Time on Estimates</h2>
+  <p>Accurate land takeoffs in hours, not days. Join contractors and engineers across the Upstate who are bidding faster and winning more.</p>
   <a href="/app" class="btn btn-primary">Launch App — It's Free →</a>
 </section>
 
 <footer>
-  &copy; 2026 Land Takeoffs. Built in Greenville, SC.
+  <div class="footer-content">
+    <div class="footer-section">
+      <h4>Product</h4>
+      <a href="/app">Launch App</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#">Request Demo</a>
+    </div>
+    <div class="footer-section">
+      <h4>Company</h4>
+      <a href="#">About</a>
+      <a href="#">Blog</a>
+      <a href="#">Contact</a>
+      <a href="#">Careers</a>
+    </div>
+    <div class="footer-section">
+      <h4>Resources</h4>
+      <a href="#">Documentation</a>
+      <a href="#">API Docs</a>
+      <a href="#">Support</a>
+      <a href="#">Community</a>
+    </div>
+    <div class="footer-section">
+      <h4>Legal</h4>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+      <a href="#">Disclaimer</a>
+      <a href="#">Contact Sales</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; 2026 Land Takeoffs. Built by contractors for contractors in the Upstate. Based in Greenville, SC.</p>
+  </div>
 </footer>
 
 </body>

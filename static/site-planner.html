@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Site Planner — Land Takeoffs</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2300d4ff'/%3E%3Cstop offset='100%25' stop-color='%2300ff88'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0f'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18 L52 44 Z' fill='url(%23g)' opacity='0.15'/%3E%3Ccircle cx='52' cy='18' r='3.5' fill='%2300ff88'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+<style>
+  :root {
+    --bg: #f5f5f5; --panel: #ffffff; --border: #d0d0d0;
+    --cyan: #0066cc; --green: #00aa55; --orange: #ff6600;
+    --text: #1a1a1a; --muted: #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'SF Pro', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+
+  /* Layout: Header + Split View */
+  .app { display: grid; grid-template-rows: 60px 1fr; height: 100vh; }
+  
+  header { background: var(--panel); border-bottom: 2px solid var(--border);
+           display: flex; align-items: center; padding: 0 24px; gap: 16px; z-index: 1000;
+           box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  header h1 { font-size: 1.3em; color: var(--cyan); font-weight: 600; }
+  
+  .split-view { display: grid; grid-template-columns: 60% 40%; height: 100%; }
+  
+  /* Map Container */
+  .map-container { position: relative; border-right: 2px solid var(--border); }
+  #map { width: 100%; height: 100%; }
+  
+  .map-instructions { position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+                      background: rgba(255,255,255,0.95); border: 2px solid var(--cyan);
+                      border-radius: 8px; padding: 12px 20px; z-index: 1000;
+                      backdrop-filter: blur(8px); text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .map-instructions h4 { color: var(--cyan); margin-bottom: 4px; font-size: 0.95em; }
+  .map-instructions p { color: var(--muted); font-size: 0.8em; }
+  
+  /* Drawing Container */
+  .drawing-container { display: flex; flex-direction: column; background: var(--bg); }
+  
+  .drawing-toolbar { background: var(--panel); border-bottom: 2px solid var(--border);
+                     padding: 12px 16px; display: flex; gap: 12px; align-items: center;
+                     flex-wrap: wrap; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  
+  .tool-btn { background: #f5f5f5; border: 1px solid var(--border);
+              padding: 8px 14px; border-radius: 6px; font-size: 0.85em; font-weight: 600;
+              color: var(--text); cursor: pointer; transition: all 0.2s;
+              display: flex; align-items: center; gap: 6px; }
+  .tool-btn:hover { background: #e8e8e8; border-color: var(--cyan); }
+  .tool-btn.active { background: var(--cyan); color: #fff; border-color: var(--cyan); }
+  
+  .tool-separator { width: 1px; height: 24px; background: var(--border); }
+  
+  .canvas-wrapper { position: relative; flex: 1; overflow: auto; background: #fff; }
+  canvas { display: block; background: #fff; }
+  
+  .drawing-instructions { position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+                          background: rgba(255,255,255,0.95); border: 2px solid var(--cyan);
+                          border-radius: 8px; padding: 12px 20px; z-index: 100;
+                          display: none; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                          color: var(--text); font-weight: 600; }
+  .drawing-instructions.visible { display: block; }
+  
+  /* Info Panel */
+  .info-panel { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.95);
+                border: 2px solid var(--border); border-radius: 10px; padding: 16px;
+                width: 260px; font-size: 0.85em; backdrop-filter: blur(8px); z-index: 100;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .info-panel h3 { color: var(--cyan); margin-bottom: 12px; font-size: 1em; }
+  .info-row { display: flex; justify-content: space-between; margin-bottom: 8px;
+              padding-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.08); }
+  .info-label { color: var(--muted); }
+  .info-value { font-weight: 600; color: var(--text); }
+  
+  /* Legend */
+  .legend { position: absolute; bottom: 20px; left: 20px; background: rgba(255,255,255,0.95);
+            border: 2px solid var(--border); border-radius: 8px; padding: 12px;
+            font-size: 0.8em; backdrop-filter: blur(8px); z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .legend h4 { color: var(--cyan); margin-bottom: 8px; font-size: 0.9em; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .legend-box { width: 24px; height: 16px; border: 2px solid #000; }
+  
+  /* Keyboard shortcuts panel */
+  .shortcuts { position: absolute; bottom: 20px; right: 20px; background: rgba(255,255,255,0.95);
+               border: 2px solid var(--border); border-radius: 8px; padding: 12px;
+               font-size: 0.75em; backdrop-filter: blur(8px); z-index: 100; max-width: 180px;
+               box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .shortcuts h4 { color: var(--cyan); margin-bottom: 8px; font-size: 0.85em; }
+  .shortcuts div { margin-bottom: 4px; line-height: 1.4; }
+  .shortcuts strong { color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <svg width="36" height="36" viewBox="0 0 64 64">
+        <defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0066cc"/><stop offset="100%" stop-color="#00aa55"/></linearGradient></defs>
+        <rect width="64" height="64" rx="14" fill="#fff" stroke="#d0d0d0" stroke-width="2"/>
+        <path d="M12 44 L24 28 L34 36 L52 18" stroke="url(#logo-g)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="52" cy="18" r="3.5" fill="#00aa55"/>
+      </svg>
+      <div>
+        <h1 style="font-size:1.3em;line-height:1;">Site Planner</h1>
+        <span style="color:var(--muted);font-size:0.75em;letter-spacing:0.5px;">RESIDENTIAL DEVELOPMENT TOOL</span>
+      </div>
+    </div>
+    <a href="/" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:2px solid var(--cyan);border-radius:6px;transition:all 0.2s;" onmouseover="this.style.background='var(--cyan)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--cyan)'">🗺️ Map View</a>
+    <a href="/estimate" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:2px solid var(--cyan);border-radius:6px;transition:all 0.2s;" onmouseover="this.style.background='var(--cyan)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--cyan)'">📋 Estimate</a>
+    <div style="margin-left:auto;color:var(--muted);font-size:0.85em;">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;"></span>
+      Online
+    </div>
+  </header>
+
+  <div class="split-view">
+    <!-- Map Side -->
+    <div class="map-container">
+      <div id="map"></div>
+      <div class="map-instructions">
+        <h4>👈 Select a Parcel</h4>
+        <p>Click any parcel to load it into the drawing canvas</p>
+      </div>
+    </div>
+
+    <!-- Drawing Side -->
+    <div class="drawing-container">
+      <div class="drawing-toolbar">
+        <button class="tool-btn active" id="btn-select" onclick="setTool('select')">
+          <span>✋</span> Select
+        </button>
+        <button class="tool-btn" id="btn-lot" onclick="setTool('lot')">
+          <span>📐</span> Lot
+        </button>
+        <button class="tool-btn" id="btn-house" onclick="setTool('house')">
+          <span>🏠</span> House
+        </button>
+        <button class="tool-btn" id="btn-road" onclick="setTool('road')">
+          <span>🛣️</span> Road
+        </button>
+        <button class="tool-btn" onclick="addPond()">
+          <span>💧</span> Pond
+        </button>
+        
+        <div class="tool-separator"></div>
+        
+        <button class="tool-btn" onclick="deleteSelected()">
+          <span>🗑️</span> Delete
+        </button>
+        <button class="tool-btn" onclick="clearCanvas()">Clear All</button>
+        <button class="tool-btn" onclick="exportPDF()" style="margin-left:auto;background:var(--cyan);color:#000;">
+          Export PDF
+        </button>
+      </div>
+      
+      <div class="canvas-wrapper">
+        <canvas id="canvas" width="2000" height="1600"></canvas>
+        
+        <div class="drawing-instructions" id="drawing-instructions"></div>
+        
+        <div class="info-panel">
+          <h3>Site Info</h3>
+          <div class="info-row">
+            <span class="info-label">PIN:</span>
+            <span class="info-value" id="pin-display">-</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Owner:</span>
+            <span class="info-value" id="owner-display">-</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Acres:</span>
+            <span class="info-value" id="acres-display">-</span>
+          </div>
+          <div style="margin:16px 0;border-top:1px solid var(--border);padding-top:12px;">
+            <div class="info-row">
+              <span class="info-label">Lots:</span>
+              <span class="info-value" id="lots-count">0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Houses:</span>
+              <span class="info-value" id="houses-count">0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Roads:</span>
+              <span class="info-value" id="roads-count">0</span>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <div class="info-row">
+              <span class="info-label">Pond Size:</span>
+              <span class="info-value" id="pond-size">-</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Required (7%):</span>
+              <span class="info-value" id="pond-required">-</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="legend">
+          <h4>Legend</h4>
+          <div class="legend-item">
+            <div class="legend-box" style="background:#fff;border:2px solid #000;"></div>
+            <span>Lot Boundary</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background:rgba(180,180,180,0.4);border:2px dashed #666;"></div>
+            <span>House Footprint</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background:#e0e0e0;border:2px solid #000;"></div>
+            <span>Road</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background:rgba(200,220,230,0.5);border:2px solid #4a90a4;"></div>
+            <span>Retention Pond</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background:transparent;border:3px dashed #000;"></div>
+            <span>Parcel Boundary</span>
+          </div>
+        </div>
+        
+        <div class="shortcuts">
+          <h4>Shortcuts</h4>
+          <div><strong>V</strong> - Select/Move</div>
+          <div><strong>L</strong> - Draw Lot</div>
+          <div><strong>H</strong> - Draw House</div>
+          <div><strong>R</strong> - Draw Road</div>
+          <div><strong>ESC</strong> - Cancel</div>
+          <div><strong>Del</strong> - Delete</div>
+          <div><strong>Shift+Click</strong> - Multi-select</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== MAP SETUP ====================
+const map = L.map('map', {
+  center: [34.8526, -82.3940],  // Greenville, SC
+  zoom: 13
+});
+
+// Base street map
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+
+// Greenville County Parcels Layer
+const parcelLayer = L.esri.featureLayer({
+  url: 'https://services1.arcgis.com/RHMZMF2X75vvhB0Y/arcgis/rest/services/Tax_Parcels/FeatureServer/0',
+  style: function(feature) {
+    return {
+      color: '#ff6600',
+      weight: 2,
+      fillOpacity: 0,
+      fillColor: 'transparent'
+    };
+  }
+}).addTo(map);
+
+let currentParcel = null;
+let currentParcelLayer = null;
+
+// Click handler for parcels
+parcelLayer.on('click', function(e) {
+  const props = e.layer.feature.properties;
+  const geom = e.layer.feature.geometry;
+  
+  console.log('Parcel clicked:', props);
+  
+  // Highlight selected parcel
+  if (currentParcelLayer) {
+    map.removeLayer(currentParcelLayer);
+  }
+  
+  currentParcelLayer = L.geoJSON(e.layer.feature, {
+    style: {
+      color: '#00aa55',
+      weight: 4,
+      fillOpacity: 0.25,
+      fillColor: '#00aa55'
+    }
+  }).addTo(map);
+  
+  // Load into drawing canvas
+  loadParcelToCanvas({
+    pin: props.PIN || props.PARCELID || props.TAX_ID || 'Unknown',
+    owner: props.OWNER || props.OWNERNAME || 'Unknown Owner',
+    acres: props.ACRES || props.CALCACRES || calculateAcres(geom),
+    geometry: geom
+  });
+  
+  // Zoom to parcel
+  map.fitBounds(currentParcelLayer.getBounds(), { padding: [50, 50] });
+});
+
+function calculateAcres(geometry) {
+  // Rough calculation - in production use proper geodesic area
+  if (geometry.type === 'Polygon' && geometry.coordinates[0]) {
+    const coords = geometry.coordinates[0];
+    let area = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+      area += coords[i][0] * coords[i+1][1] - coords[i+1][0] * coords[i][1];
+    }
+    area = Math.abs(area / 2);
+    // Very rough conversion (needs proper projection)
+    return (area * 111000 * 111000 / 43560).toFixed(2);
+  }
+  return 1.0;
+}
+
+// ==================== DRAWING CANVAS SETUP ====================
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let currentTool = 'select';
+let parcelBoundary = null;
+let parcelData = null;
+let shapes = [];
+let selectedShapes = [];
+let currentPolygon = null;
+let dragMode = false;
+let dragStart = null;
+let dragOffsets = [];
+let selectionBox = null;
+let lotCounter = 1;
+let houseCounter = 1;
+
+function loadParcelToCanvas(data) {
+  parcelData = data;
+  
+  // Update info panel
+  document.getElementById('pin-display').textContent = data.pin;
+  document.getElementById('owner-display').textContent = data.owner.length > 20 
+    ? data.owner.substring(0, 20) + '...' 
+    : data.owner;
+  document.getElementById('acres-display').textContent = data.acres;
+  
+  // Calculate pond requirement
+  const totalSF = data.acres * 43560;
+  const pondRequired = totalSF * 0.07;
+  document.getElementById('pond-required').textContent = Math.round(pondRequired).toLocaleString() + ' SF';
+  
+  // Convert geometry to canvas coordinates
+  if (data.geometry && data.geometry.coordinates) {
+    parcelBoundary = convertGeometryToCanvas(data.geometry);
+  }
+  
+  // Clear existing drawings
+  shapes = [];
+  selectedShapes = [];
+  lotCounter = 1;
+  houseCounter = 1;
+  
+  redraw();
+  updateCounts();
+}
+
+function convertGeometryToCanvas(geometry) {
+  // Extract coordinates (handle both Polygon and MultiPolygon)
+  let coords = [];
+  if (geometry.type === 'Polygon') {
+    coords = geometry.coordinates[0];
+  } else if (geometry.type === 'MultiPolygon') {
+    coords = geometry.coordinates[0][0];
+  }
+  
+  if (coords.length === 0) return null;
+  
+  // Find bounds
+  const lngs = coords.map(c => c[0]);
+  const lats = coords.map(c => c[1]);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  
+  // Scale to canvas (with padding)
+  const padding = 100;
+  const availWidth = canvas.width - (padding * 2);
+  const availHeight = canvas.height - (padding * 2);
+  
+  const lngRange = maxLng - minLng;
+  const latRange = maxLat - minLat;
+  
+  const scale = Math.min(availWidth / lngRange, availHeight / latRange) * 100000; // Adjust multiplier for map scale
+  
+  // Convert to canvas coords
+  return coords.map(coord => ({
+    x: (coord[0] - minLng) * scale + padding,
+    y: canvas.height - ((coord[1] - minLat) * scale + padding)  // Flip Y axis
+  }));
+}
+
+function setTool(tool) {
+  currentTool = tool;
+  currentPolygon = null;
+  selectedShapes = [];
+  
+  // Update button states
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('btn-' + tool);
+  if (btn) btn.classList.add('active');
+  
+  // Update cursor
+  canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+  
+  // Show instructions
+  const instructions = document.getElementById('drawing-instructions');
+  if (tool === 'lot' || tool === 'house' || tool === 'road') {
+    instructions.textContent = 'Click to add points. Double-click to finish. ESC to cancel.';
+    instructions.classList.add('visible');
+  } else {
+    instructions.classList.remove('visible');
+  }
+  
+  redraw();
+}
+
+function addPond() {
+  if (!parcelData) {
+    alert('Please select a parcel first');
+    return;
+  }
+  
+  const totalSF = parcelData.acres * 43560;
+  const pondSF = totalSF * 0.07;
+  const pondDim = Math.sqrt(pondSF) * 2; // Scale for canvas
+  
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  
+  const pond = {
+    type: 'pond',
+    points: [
+      {x: centerX - pondDim/2, y: centerY - pondDim/2},
+      {x: centerX + pondDim/2, y: centerY - pondDim/2},
+      {x: centerX + pondDim/2, y: centerY + pondDim/2},
+      {x: centerX - pondDim/2, y: centerY + pondDim/2}
+    ],
+    sizeSF: pondSF
+  };
+  
+  shapes.push(pond);
+  document.getElementById('pond-size').textContent = Math.round(pondSF).toLocaleString() + ' SF';
+  redraw();
+  updateCounts();
+}
+
+function clearCanvas() {
+  if (shapes.length === 0) return;
+  if (confirm('Clear all drawings? This cannot be undone.')) {
+    shapes = [];
+    selectedShapes = [];
+    lotCounter = 1;
+    houseCounter = 1;
+    redraw();
+    updateCounts();
+    document.getElementById('pond-size').textContent = '-';
+  }
+}
+
+function deleteSelected() {
+  if (selectedShapes.length === 0) return;
+  
+  selectedShapes.forEach(shape => {
+    const idx = shapes.indexOf(shape);
+    if (idx > -1) shapes.splice(idx, 1);
+  });
+  
+  selectedShapes = [];
+  redraw();
+  updateCounts();
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw grid
+  ctx.strokeStyle = '#f0f0f0';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < canvas.width; x += 50) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += 50) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  
+  // Draw parcel boundary
+  if (parcelBoundary) {
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 10]);
+    ctx.beginPath();
+    parcelBoundary.forEach((pt, i) => {
+      if (i === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  
+  // Draw all shapes
+  shapes.forEach(shape => {
+    const isSelected = selectedShapes.includes(shape);
+    
+    if (shape.type === 'lot') {
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = isSelected ? '#0066ff' : '#000';
+      ctx.lineWidth = isSelected ? 3 : 2;
+      
+      ctx.beginPath();
+      shape.points.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      
+      const center = getPolygonCenter(shape.points);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('LOT ' + shape.number, center.x, center.y);
+      
+    } else if (shape.type === 'house') {
+      ctx.fillStyle = 'rgba(180, 180, 180, 0.4)';
+      ctx.strokeStyle = isSelected ? '#0066ff' : '#666';
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.setLineDash([5, 3]);
+      
+      ctx.beginPath();
+      shape.points.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      const center = getPolygonCenter(shape.points);
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 11px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('HOUSE ' + shape.number, center.x, center.y);
+      
+    } else if (shape.type === 'road') {
+      // Draw road as thick line
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 30;
+      
+      ctx.beginPath();
+      shape.points.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.stroke();
+      
+      // Border
+      ctx.strokeStyle = isSelected ? '#0066ff' : '#000';
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.beginPath();
+      shape.points.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.stroke();
+      
+      // Centerline
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([10, 5]);
+      ctx.beginPath();
+      shape.points.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+    } else if (shape.type === 'pond') {
+      ctx.fillStyle = 'rgba(200, 220, 230, 0.5)';
+      ctx.strokeStyle = isSelected ? '#0066ff' : '#4a90a4';
+      ctx.lineWidth = isSelected ? 3 : 2;
+      
+      ctx.beginPath();
+      shape.points.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      
+      const center = getPolygonCenter(shape.points);
+      ctx.fillStyle = '#2c5f6f';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('RETENTION POND', center.x, center.y - 10);
+      ctx.font = '10px Arial';
+      ctx.fillText(Math.round(shape.sizeSF).toLocaleString() + ' SF', center.x, center.y + 10);
+    }
+  });
+  
+  // Draw current polygon being drawn
+  if (currentPolygon && currentPolygon.points.length > 0) {
+    ctx.strokeStyle = '#0066ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    
+    ctx.beginPath();
+    currentPolygon.points.forEach((pt, i) => {
+      if (i === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Draw points
+    currentPolygon.points.forEach(pt => {
+      ctx.fillStyle = '#0066ff';
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  
+  // Draw selection box
+  if (selectionBox) {
+    ctx.strokeStyle = '#0066ff';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height);
+    ctx.setLineDash([]);
+  }
+}
+
+function getPolygonCenter(points) {
+  const sumX = points.reduce((sum, pt) => sum + pt.x, 0);
+  const sumY = points.reduce((sum, pt) => sum + pt.y, 0);
+  return { x: sumX / points.length, y: sumY / points.length };
+}
+
+function pointInPolygon(pt, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = ((yi > pt.y) !== (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function isPointInParcel(pt) {
+  if (!parcelBoundary) return true;
+  return pointInPolygon(pt, parcelBoundary);
+}
+
+function updateCounts() {
+  document.getElementById('lots-count').textContent = shapes.filter(s => s.type === 'lot').length;
+  document.getElementById('houses-count').textContent = shapes.filter(s => s.type === 'house').length;
+  document.getElementById('roads-count').textContent = shapes.filter(s => s.type === 'road').length;
+}
+
+// Mouse events
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  if (currentTool === 'select') {
+    let clickedShape = null;
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      if (pointInPolygon({x, y}, shapes[i].points)) {
+        clickedShape = shapes[i];
+        break;
+      }
+    }
+    
+    if (clickedShape) {
+      if (e.shiftKey) {
+        if (selectedShapes.includes(clickedShape)) {
+          selectedShapes = selectedShapes.filter(s => s !== clickedShape);
+        } else {
+          selectedShapes.push(clickedShape);
+        }
+      } else {
+        if (!selectedShapes.includes(clickedShape)) {
+          selectedShapes = [clickedShape];
+        }
+      }
+      
+      dragMode = true;
+      dragStart = {x, y};
+      dragOffsets = selectedShapes.map(shape => ({
+        shape,
+        offsets: shape.points.map(pt => ({ dx: pt.x - x, dy: pt.y - y }))
+      }));
+    } else {
+      if (!e.shiftKey) {
+        selectedShapes = [];
+      }
+      selectionBox = {x, y, width: 0, height: 0};
+    }
+    
+  } else if (currentTool === 'lot' || currentTool === 'house' || currentTool === 'road') {
+    if (!isPointInParcel({x, y})) {
+      alert('Cannot draw outside parcel boundary');
+      return;
+    }
+    
+    if (!currentPolygon) {
+      currentPolygon = { type: currentTool, points: [] };
+    }
+    
+    currentPolygon.points.push({x, y});
+  }
+  
+  redraw();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  if (dragMode && dragStart) {
+    const dx = x - dragStart.x;
+    const dy = y - dragStart.y;
+    
+    dragOffsets.forEach(({shape, offsets}) => {
+      shape.points = offsets.map(offset => ({
+        x: dragStart.x + dx + offset.dx,
+        y: dragStart.y + dy + offset.dy
+      }));
+    });
+    
+    redraw();
+    
+  } else if (selectionBox) {
+    selectionBox.width = x - selectionBox.x;
+    selectionBox.height = y - selectionBox.y;
+    redraw();
+  }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  if (dragMode) {
+    dragMode = false;
+    dragStart = null;
+    dragOffsets = [];
+  }
+  
+  if (selectionBox) {
+    const box = {
+      minX: Math.min(selectionBox.x, selectionBox.x + selectionBox.width),
+      maxX: Math.max(selectionBox.x, selectionBox.x + selectionBox.width),
+      minY: Math.min(selectionBox.y, selectionBox.y + selectionBox.height),
+      maxY: Math.max(selectionBox.y, selectionBox.y + selectionBox.height)
+    };
+    
+    shapes.forEach(shape => {
+      const center = getPolygonCenter(shape.points);
+      if (center.x >= box.minX && center.x <= box.maxX &&
+          center.y >= box.minY && center.y <= box.maxY) {
+        if (!selectedShapes.includes(shape)) {
+          selectedShapes.push(shape);
+        }
+      }
+    });
+    
+    selectionBox = null;
+    redraw();
+  }
+});
+
+canvas.addEventListener('dblclick', (e) => {
+  if (currentTool === 'lot' || currentTool === 'house' || currentTool === 'road') {
+    if (currentPolygon && currentPolygon.points.length >= 3) {
+      const allInside = currentPolygon.points.every(pt => isPointInParcel(pt));
+      if (!allInside) {
+        alert('Polygon extends outside parcel boundary');
+        currentPolygon = null;
+        redraw();
+        return;
+      }
+      
+      if (currentTool === 'lot') {
+        currentPolygon.number = lotCounter++;
+      } else if (currentTool === 'house') {
+        currentPolygon.number = houseCounter++;
+      }
+      
+      shapes.push(currentPolygon);
+      currentPolygon = null;
+      updateCounts();
+      redraw();
+    }
+  }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    currentPolygon = null;
+    selectedShapes = [];
+    redraw();
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    deleteSelected();
+  } else if (e.key.toLowerCase() === 'v') {
+    setTool('select');
+  } else if (e.key.toLowerCase() === 'l') {
+    setTool('lot');
+  } else if (e.key.toLowerCase() === 'h') {
+    setTool('house');
+  } else if (e.key.toLowerCase() === 'r') {
+    setTool('road');
+  }
+});
+
+function exportPDF() {
+  alert('PDF export coming soon - will generate clean architectural drawing');
+}
+
+// Initialize
+setTool('select');
+redraw();
+</script>
+
+</body>
+</html>
