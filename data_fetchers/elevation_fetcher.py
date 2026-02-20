@@ -1,0 +1,279 @@
+"""Fetch DEM elevation data from the OpenTopography API."""
+
+import io
+import logging
+import struct
+from typing import Dict, Optional, Tuple
+
+import numpy as np
+
+from config import config
+
+logger = logging.getLogger(__name__)
+
+try:
+    import rasterio
+    from rasterio.io import MemoryFile
+    HAS_RASTERIO = True
+except ImportError:
+    HAS_RASTERIO = False
+
+try:
+    from PIL import Image
+    import io
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+
+class ElevationFetcher:
+    """Download and analyse DEM rasters from OpenTopography."""
+
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or config.OPENTOPOGRAPHY_API_KEY
+        self.base_url = config.OPENTOPOGRAPHY_BASE_URL
+
+    def fetch_dem_for_parcel(
+        self,
+        bounds: Tuple[float, float, float, float],
+        buffer_distance: float = 0.001,
+        dem_type: str = "SRTMGL1",
+    ) -> Tuple[np.ndarray, dict]:
+        """Download a DEM raster covering the given WGS-84 bounding box.
+
+        Returns:
+            Tuple of (elevation_array, raster_profile).
+        """
+        west, south, east, north = bounds
+        west -= buffer_distance
+        south -= buffer_distance
+        east += buffer_distance
+        north += buffer_distance
+
+        logger.info(
+            "Fetching DEM (%s) for bounds: W=%.5f S=%.5f E=%.5f N=%.5f",
+            dem_type, west, south, east, north,
+        )
+
+        url = f"{self.base_url}/globaldem"
+        params = {
+            "demtype": dem_type,
+            "south": south,
+            "north": north,
+            "west": west,
+            "east": east,
+            "outputFormat": "GTiff",
+            "API_Key": self.api_key,
+        }
+
+        if requests is None:
+            raise RuntimeError("requests library is required")
+
+        response = requests.get(url, params=params, timeout=120)
+
+        # Check for API errors (OpenTopography returns HTML/text on errors)
+        ct = response.headers.get('content-type', '')
+        if response.status_code != 200 or 'tiff' not in ct.lower() and 'octet' not in ct.lower():
+            logger.error("OpenTopography error: status=%s, content-type=%s, body=%s",
+                         response.status_code, ct, response.text[:500])
+            raise RuntimeError(f"OpenTopography API error: {response.text[:200]}")
+
+        if len(response.content) < 100:
+            logger.error("OpenTopography returned tiny response (%d bytes): %s",
+                         len(response.content), response.text[:200])
+            raise RuntimeError("OpenTopography returned empty/invalid DEM data")
+
+        if HAS_RASTERIO:
+            return self._parse_with_rasterio(response.content)
+        elif HAS_PILLOW:
+            return self._parse_with_pillow(response.content, west, south, east, north)
+        else:
+            return self._parse_geotiff_minimal(response.content, west, south, east, north)
+
+    def _parse_with_rasterio(self, data: bytes) -> Tuple[np.ndarray, dict]:
+        """Parse GeoTIFF using rasterio (full featured)."""
+        with MemoryFile(data) as memfile:
+            with memfile.open() as dataset:
+                elevation = dataset.read(1).astype(np.float64)
+                profile = dict(dataset.profile)
+        logger.info("DEM fetched (rasterio): shape=%s", elevation.shape)
+        return elevation, profile
+
+    def _parse_with_pillow(self, data: bytes, west, south, east, north) -> Tuple[np.ndarray, dict]:
+        """Parse GeoTIFF using Pillow."""
+        try:
+            img = Image.open(io.BytesIO(data))
+            elevation = np.array(img).astype(np.float64)
+            
+            # Handle different image modes
+            if elevation.ndim == 3:
+                elevation = elevation[:, :, 0]  # Take first band
+            
+            height, width = elevation.shape
+            
+            # Build profile with transform info
+            x_res = (east - west) / width
+            y_res = (north - south) / height
+            profile = {
+                "width": width,
+                "height": height,
+                "transform": [x_res, 0, west, 0, -y_res, north],
+            }
+            
+            logger.info("DEM fetched (Pillow): shape=%s, min=%.1f, max=%.1f, dtype=%s",
+                       elevation.shape, float(np.nanmin(elevation)), float(np.nanmax(elevation)), elevation.dtype)
+            return elevation, profile
+            
+        except Exception as e:
+            logger.error(f"Pillow TIFF parsing failed: {e}")
+            raise RuntimeError(f"Failed to parse GeoTIFF with Pillow: {e}")
+
+    def _parse_geotiff_minimal(self, data: bytes, west, south, east, north) -> Tuple[np.ndarray, dict]:
+        """Parse GeoTIFF without rasterio — basic TIFF parser for single-band DEMs."""
+        import struct
+
+        # Read TIFF header
+        bo = '<' if data[:2] == b'II' else '>'
+        magic = struct.unpack_from(f'{bo}H', data, 2)[0]
+        if magic != 42:
+            raise ValueError("Not a valid TIFF file")
+
+        ifd_offset = struct.unpack_from(f'{bo}I', data, 4)[0]
+        num_entries = struct.unpack_from(f'{bo}H', data, ifd_offset)[0]
+
+        tags = {}
+        for i in range(num_entries):
+            entry_offset = ifd_offset + 2 + i * 12
+            tag, dtype, count = struct.unpack_from(f'{bo}HHI', data, entry_offset)
+            if dtype == 3 and count == 1:  # SHORT
+                val = struct.unpack_from(f'{bo}H', data, entry_offset + 8)[0]
+            elif dtype == 4 and count == 1:  # LONG
+                val = struct.unpack_from(f'{bo}I', data, entry_offset + 8)[0]
+            elif dtype == 1 and count == 1:  # BYTE
+                val = data[entry_offset + 8]
+            else:
+                val = struct.unpack_from(f'{bo}I', data, entry_offset + 8)[0]
+            tags[tag] = (dtype, count, val)
+
+        width = tags.get(256, (0, 0, 0))[2]   # ImageWidth
+        height = tags.get(257, (0, 0, 0))[2]   # ImageLength
+        bits = tags.get(258, (0, 0, 16))[2]     # BitsPerSample
+        sample_format = tags.get(339, (0, 0, 1))[2]  # SampleFormat (1=uint, 2=int, 3=float)
+        strip_offsets = tags.get(273, (0, 0, 0))[2]
+        strip_byte_counts = tags.get(279, (0, 0, 0))[2]
+
+        # Handle strip offsets that point to an array
+        so_dtype, so_count, so_val = tags.get(273, (4, 1, 0))
+        if so_count == 1:
+            offsets = [so_val]
+        elif so_count > 1:
+            fmt = f'{bo}{so_count}I' if so_dtype == 4 else f'{bo}{so_count}H'
+            try:
+                offsets = list(struct.unpack_from(fmt, data, so_val))
+            except struct.error as e:
+                logger.error(f"Failed to unpack strip offsets: {e}, count={so_count}, val={so_val}")
+                offsets = []
+        else:
+            offsets = []
+
+        sbc_dtype, sbc_count, sbc_val = tags.get(279, (4, 1, 0))
+        if sbc_count == 1:
+            byte_counts = [sbc_val]
+        elif sbc_count > 1:
+            fmt = f'{bo}{sbc_count}I' if sbc_dtype == 4 else f'{bo}{sbc_count}H'
+            try:
+                byte_counts = list(struct.unpack_from(fmt, data, sbc_val))
+            except struct.error as e:
+                logger.error(f"Failed to unpack byte counts: {e}, count={sbc_count}, val={sbc_val}")
+                byte_counts = []
+        else:
+            byte_counts = []
+        
+        if not offsets or not byte_counts:
+            # Try tiled format (tags 324, 325 for tile offsets/byte counts)
+            tile_offsets = tags.get(324, None)
+            tile_byte_counts = tags.get(325, None)
+            
+            if tile_offsets and tile_byte_counts:
+                logger.info("TIFF uses tiles instead of strips")
+                to_dtype, to_count, to_val = tile_offsets
+                tbc_dtype, tbc_count, tbc_val = tile_byte_counts
+                
+                if to_count == 1:
+                    offsets = [to_val]
+                else:
+                    fmt = f'{bo}{to_count}I' if to_dtype == 4 else f'{bo}{to_count}H'
+                    offsets = list(struct.unpack_from(fmt, data, to_val))
+                
+                if tbc_count == 1:
+                    byte_counts = [tbc_val]
+                else:
+                    fmt = f'{bo}{tbc_count}I' if tbc_dtype == 4 else f'{bo}{tbc_count}H'
+                    byte_counts = list(struct.unpack_from(fmt, data, tbc_val))
+            else:
+                logger.error(f"Missing strip/tile info: offsets={len(offsets)}, byte_counts={len(byte_counts)}")
+                logger.error(f"TIFF tags: {[(k, v) for k, v in tags.items() if k in [273, 279, 324, 325, 256, 257]]}")
+                raise RuntimeError("Cannot find strip offsets/byte counts or tile offsets/byte counts in TIFF")
+
+        # Read pixel data
+        raw = b''
+        for off, bc in zip(offsets, byte_counts):
+            if off < len(data) and bc > 0:
+                raw += data[off:off + bc]
+            else:
+                logger.error(f"Invalid strip: offset={off}, bytes={bc}, data_len={len(data)}")
+
+        # Check if we got data
+        if len(raw) == 0:
+            logger.error(f"No pixel data extracted from TIFF. Tags: {list(tags.keys())}")
+            raise RuntimeError("Failed to extract pixel data from GeoTIFF - empty strips")
+        
+        expected_size = width * height * (bits // 8)
+        if len(raw) != expected_size:
+            logger.error(f"Pixel data size mismatch: got {len(raw)} bytes, expected {expected_size}")
+            # Try to use what we have
+            if len(raw) < expected_size:
+                raise RuntimeError(f"Insufficient pixel data: {len(raw)} < {expected_size} bytes")
+
+        # Convert to numpy
+        if bits == 16 and sample_format == 2:
+            elevation = np.frombuffer(raw, dtype=f'{bo.replace("<","<").replace(">",">")}i2').reshape(height, width).astype(np.float64)
+        elif bits == 16 and sample_format == 1:
+            elevation = np.frombuffer(raw, dtype=f'{bo.replace("<","<").replace(">",">")}u2').reshape(height, width).astype(np.float64)
+        elif bits == 32 and sample_format == 3:
+            elevation = np.frombuffer(raw, dtype=f'{bo.replace("<","<").replace(">",">")}f4').reshape(height, width).astype(np.float64)
+        else:
+            elevation = np.frombuffer(raw, dtype=f'{bo.replace("<","<").replace(">",">")}i2').reshape(height, width).astype(np.float64)
+
+        # Build a minimal profile with transform info
+        x_res = (east - west) / width
+        y_res = (north - south) / height
+        profile = {
+            "width": width,
+            "height": height,
+            "transform": [x_res, 0, west, 0, -y_res, north],
+        }
+
+        logger.info("DEM fetched (minimal parser): shape=%s, min=%.1f, max=%.1f",
+                     elevation.shape, float(np.nanmin(elevation)), float(np.nanmax(elevation)))
+        return elevation, profile
+
+    @staticmethod
+    def calculate_elevation_statistics(elevation: np.ndarray) -> Dict[str, float]:
+        valid = elevation[~np.isnan(elevation)]
+        if valid.size == 0:
+            return {k: 0.0 for k in ("min", "max", "mean", "std", "median", "range")}
+
+        return {
+            "min": float(np.min(valid)),
+            "max": float(np.max(valid)),
+            "mean": float(np.mean(valid)),
+            "std": float(np.std(valid)),
+            "median": float(np.median(valid)),
+            "range": float(np.ptp(valid)),
+        }

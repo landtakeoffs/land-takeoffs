@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SessionStorage Test</title>
+</head>
+<body style="font-family: monospace; padding: 40px;">
+    <h1>SessionStorage Test</h1>
+    
+    <h2>Save Data:</h2>
+    <button onclick="saveTest()">Save Test Data</button>
+    
+    <h2>Load Data:</h2>
+    <button onclick="loadTest()">Load Test Data</button>
+    
+    <h2>Check Estimate Data:</h2>
+    <button onclick="checkEstimate()">Check Estimate Data</button>
+    
+    <pre id="output" style="background: #f0f0f0; padding: 20px; margin-top: 20px;"></pre>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function saveTest() {
+            const testData = {
+                sections: [
+                    {name: 'Earthwork', total: 50000},
+                    {name: 'Erosion Control', total: 30000},
+                    {name: 'Storm Drainage', total: 40000}
+                ],
+                acres: 10,
+                lots: 50
+            };
+            
+            sessionStorage.setItem('estimateData', JSON.stringify(testData));
+            output.textContent = 'Saved:\n' + JSON.stringify(testData, null, 2);
+        }
+        
+        function loadTest() {
+            const data = sessionStorage.getItem('estimateData');
+            if (data) {
+                output.textContent = 'Loaded:\n' + JSON.stringify(JSON.parse(data), null, 2);
+            } else {
+                output.textContent = 'No data found in sessionStorage';
+            }
+        }
+        
+        function checkEstimate() {
+            const data = sessionStorage.getItem('estimateData');
+            output.textContent = 'Raw data:\n' + (data || 'NULL');
+            
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    output.textContent += '\n\nParsed successfully!\n';
+                    output.textContent += 'Acres: ' + parsed.acres + '\n';
+                    output.textContent += 'Lots: ' + parsed.lots + '\n';
+                    output.textContent += 'Sections: ' + parsed.sections.length;
+                } catch (e) {
+                    output.textContent += '\n\nParse error: ' + e.message;
+                }
+            }
+        }
+        
+        // Auto-check on load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkEstimate();
+        });
+    </script>
+</body>
+</html>

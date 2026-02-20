@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Land Takeoffs — Concept Plan</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f; --panel: #12121a; --border: #1e1e2e;
+    --cyan: #00d4ff; --green: #00ff88; --orange: #ff8800;
+    --text: #e0e0e0; --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'SF Pro', sans-serif; background: var(--bg); color: var(--text); }
+
+  .app { display: grid; grid-template-columns: 340px 1fr; grid-template-rows: 60px 1fr; height: 100vh; }
+  header { grid-column: 1 / -1; background: var(--panel); border-bottom: 1px solid var(--border);
+           display: flex; align-items: center; padding: 0 24px; gap: 16px; }
+  header h1 { font-size: 1.3em; color: var(--cyan); font-weight: 600; }
+
+  .sidebar { background: var(--panel); border-right: 1px solid var(--border);
+             overflow-y: auto; padding: 20px; }
+  .canvas-wrap { display: flex; align-items: center; justify-content: center; background: #fff; overflow: auto; }
+
+  .card { background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+          border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h3 { font-size: 0.9em; color: var(--cyan); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  label { display: block; font-size: 0.8em; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
+  input, select { width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+                  border-radius: 6px; color: var(--text); font-size: 0.9em; }
+  input:focus, select:focus { outline: none; border-color: var(--cyan); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 0.95em;
+         font-weight: 600; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
+  .btn-primary { background: var(--cyan); color: #000; }
+  .btn-primary:hover { background: #33ddff; }
+  .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+  .legend { margin-top: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.82em; padding: 3px 0; }
+  .legend-swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #ccc; flex-shrink: 0; }
+
+  .nav-links { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+  .nav-links a { color: var(--cyan); text-decoration: none; font-size: 0.9em; font-weight: 600;
+                 padding: 8px 16px; border: 1px solid var(--cyan); border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <svg width="36" height="36" viewBox="0 0 64 64"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#00ff88"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="#0a0a0f" stroke="#1e1e2e" stroke-width="2"/><path d="M12 44 L24 28 L34 36 L52 18" stroke="url(#lg)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 44 L24 28 L34 36 L52 18 L52 44 Z" fill="url(#lg)" opacity="0.15"/><circle cx="52" cy="18" r="3.5" fill="#00ff88"/></svg>
+    <div>
+      <h1>Concept Plan Generator</h1>
+      <span style="color:var(--muted);font-size:0.75em;">PRELIMINARY SITE LAYOUT</span>
+    </div>
+    <div class="nav-links">
+      <a href="/app">🗺️ Map</a>
+      <a href="/estimate">📋 Estimate</a>
+    </div>
+  </header>
+
+  <div class="sidebar">
+    <div class="card">
+      <h3>📐 Site Parameters</h3>
+      <label>Project Name</label>
+      <input type="text" id="projectName" placeholder="e.g. Pennington Ridge">
+      <label>Developer / Owner</label>
+      <input type="text" id="ownerName" placeholder="e.g. Clear Path Development">
+
+      <div class="row">
+        <div><label>Total Acreage</label><input type="number" id="totalAcres" value="25" step="0.1" min="1"></div>
+        <div><label>Lot Size (sq ft)</label><input type="number" id="lotSize" value="7000" step="500" min="2000"></div>
+      </div>
+      <div class="row">
+        <div><label>Lot Width (ft)</label><input type="number" id="lotWidth" value="70" step="5" min="30"></div>
+        <div><label>Lot Depth (ft)</label><input type="number" id="lotDepth" value="100" step="5" min="50"></div>
+      </div>
+      <label>Road Width (ft)</label>
+      <input type="number" id="roadWidth" value="50" step="2" min="24">
+
+      <div class="row">
+        <div><label>Front Setback (ft)</label><input type="number" id="setbackFront" value="25" step="5"></div>
+        <div><label>Rear Setback (ft)</label><input type="number" id="setbackRear" value="25" step="5"></div>
+      </div>
+      <div class="row">
+        <div><label>Side Setback (ft)</label><input type="number" id="setbackSide" value="10" step="1"></div>
+        <div><label>House Width (ft)</label><input type="number" id="houseWidth" value="40" step="5" min="20"></div>
+      </div>
+      <div class="row">
+        <div><label>Perimeter Buffer (ft)</label><input type="number" id="perimBuffer" value="50" step="10"></div>
+        <div><label>Pond Size (%)</label><input type="number" id="pondPct" value="7" step="1" min="1" max="20"></div>
+      </div>
+
+      <label>Layout Style</label>
+      <select id="layoutStyle">
+        <option value="grid">Grid Layout</option>
+        <option value="loop">Loop Road</option>
+        <option value="cul-de-sac">Cul-de-sac</option>
+      </select>
+
+      <button class="btn btn-primary" onclick="generatePlan()">⚡ Generate Concept Plan</button>
+    </div>
+
+    <div class="card">
+      <h3>📊 Summary</h3>
+      <div id="summary" style="font-size:0.85em;color:var(--muted);">
+        Configure parameters and click Generate.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🎨 Legend</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:#333;"></div> Property Boundary</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#888;"></div> Roads / ROW</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#ffffcc;border-color:#aa9;"></div> Residential Lots</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#cce5ff;border-color:#69a;"></div> Retention Pond</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#d5f5d5;border-color:#6a6;"></div> Open Space / Buffer</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:none;border:2px dashed #c66;"></div> Building Envelope</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(180,160,140,0.35);border-color:#987;"></div> House Footprint</div>
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="downloadPDF()">📄 Download PDF</button>
+    <button class="btn btn-secondary" onclick="downloadPNG()" style="margin-top:8px;">🖼️ Download PNG</button>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="planCanvas" width="1100" height="850"></canvas>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('planCanvas');
+const ctx = canvas.getContext('2d');
+
+// Read URL params (from map page)
+const params = new URLSearchParams(window.location.search);
+if (params.get('acres')) document.getElementById('totalAcres').value = params.get('acres');
+if (params.get('acreage')) document.getElementById('totalAcres').value = params.get('acreage');
+if (params.get('subdiv')) document.getElementById('projectName').value = params.get('subdiv');
+if (params.get('subdivision')) document.getElementById('projectName').value = params.get('subdivision');
+if (params.get('owner')) document.getElementById('ownerName').value = params.get('owner');
+
+// Check if we have real parcel geometry
+if (params.get('geometry')) {
+  console.log('Real parcel geometry detected - will use actual parcel boundaries');
+}
+
+/* =============================================
+   COLLISION GRID — prevents any overlap
+   ============================================= */
+class CollisionGrid {
+  constructor(w, h) { this.w = w; this.h = h; this.rects = []; }
+  add(x, y, w, h, type) { this.rects.push({ x, y, w, h, type }); }
+  fits(x, y, w, h, pad = 0) {
+    if (x - pad < 0 || y - pad < 0 || x + w + pad > this.w || y + h + pad > this.h) return false;
+    for (const r of this.rects) {
+      if (x < r.x + r.w + pad && x + w + pad > r.x && y < r.y + r.h + pad && y + h + pad > r.y) return false;
+    }
+    return true;
+  }
+}
+
+function generatePlan() {
+  const totalAcres = parseFloat(document.getElementById('totalAcres').value);
+  const lotWidth = parseFloat(document.getElementById('lotWidth').value);
+  const lotDepth = parseFloat(document.getElementById('lotDepth').value);
+  const roadWidth = parseFloat(document.getElementById('roadWidth').value);
+  const setbackFront = parseFloat(document.getElementById('setbackFront').value);
+  const setbackSide = parseFloat(document.getElementById('setbackSide').value);
+  const perimBuffer = parseFloat(document.getElementById('perimBuffer').value);
+  const pondPct = parseFloat(document.getElementById('pondPct').value) / 100;
+  const layoutStyle = document.getElementById('layoutStyle').value;
+  const projectName = document.getElementById('projectName').value || 'Untitled Project';
+  const ownerName = document.getElementById('ownerName').value || '';
+
+  const totalSqFt = totalAcres * 43560;
+
+  // Drawing area
+  const drawW = 1060, drawH = 720, titleH = 100, margin = 40;
+
+  // Check if we have real parcel geometry from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const parcelGeometry = urlParams.get('geometry');
+  let actualParcelBounds = null;
+  
+  if (parcelGeometry) {
+    try {
+      const geom = JSON.parse(decodeURIComponent(parcelGeometry));
+      if (geom.coordinates && geom.coordinates[0]) {
+        // Calculate bounding box from polygon coordinates
+        const coords = geom.coordinates[0];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        
+        coords.forEach(([x, y]) => {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        });
+        
+        // Convert lat/lon degrees to approximate feet (rough conversion for SC)
+        const latToFeet = 364000; // feet per degree latitude
+        const lonToFeet = 288200; // feet per degree longitude (at SC latitude ~34°)
+        
+        const widthFt = (maxX - minX) * lonToFeet;
+        const heightFt = (maxY - minY) * latToFeet;
+        
+        actualParcelBounds = {
+          coordinates: coords,
+          bounds: { 
+            minX, minY, maxX, maxY,
+            width: maxX - minX,
+            height: maxY - minY
+          },
+          widthFt: widthFt,
+          heightFt: heightFt
+        };
+        
+        console.log(`Using real parcel: ${widthFt.toFixed(0)}' x ${heightFt.toFixed(0)}'`);
+        console.log('Parcel coordinates:', coords);
+        console.log('Bounds:', actualParcelBounds.bounds);
+      }
+    } catch (e) {
+      console.log('Invalid geometry parameter, using default rectangle');
+    }
+  }
+
+  // Property dimensions 
+  let propW_ft, propH_ft;
+  if (actualParcelBounds) {
+    propW_ft = actualParcelBounds.widthFt;
+    propH_ft = actualParcelBounds.heightFt;
+  } else {
+    // Default: slightly rectangular proportions
+    const aspect = 1.35;
+    propW_ft = Math.sqrt(totalSqFt * aspect);
+    propH_ft = totalSqFt / propW_ft;
+  }
+
+  // Scale to fit with margin
+  const scale = Math.min((drawW - margin * 2) / propW_ft, (drawH - margin * 2) / propH_ft);
+  const propW = propW_ft * scale;
+  const propH = propH_ft * scale;
+  const ox = (drawW - propW) / 2;
+  const oy = (drawH - propH) / 2;
+
+  // Pixel conversions
+  const bufPx = perimBuffer * scale;
+  const roadPx = Math.max(roadWidth * scale, 6); // min 6px visible
+  const roadDraw = Math.min(roadPx, 18); // cap visual road width so it doesn't dominate
+  const lotWPx = lotWidth * scale;
+  const lotDPx = lotDepth * scale;
+  const sideGap = Math.max(setbackSide * scale * 2, 4); // side-to-side spacing (both setbacks)
+  const frontGap = Math.max(setbackFront * scale, 4);  // front setback from road
+  const gap = sideGap; // default gap between lots
+
+  // Developable area (inside buffer)
+  const devX = ox + bufPx;
+  const devY = oy + bufPx;
+  const devW = propW - bufPx * 2;
+  const devH = propH - bufPx * 2;
+
+  // Collision grid
+  const grid = new CollisionGrid(canvas.width, canvas.height);
+
+  // Pond placement — bottom-right, sized proportionally but capped
+  const pondArea = totalSqFt * pondPct;
+  const pondMaxR = Math.min(devW * 0.18, devH * 0.22);
+  const pondRx = Math.min(Math.sqrt(pondArea) * scale * 0.5, pondMaxR);
+  const pondRy = pondRx * 0.6;
+  const pondCx = devX + devW - pondRx - 8;
+  const pondCy = devY + devH - pondRy - 8;
+  // Reserve pond in collision grid
+  grid.add(pondCx - pondRx - 5, pondCy - pondRy - 5, pondRx * 2 + 10, pondRy * 2 + 10, 'pond');
+
+  // ---- ROAD LAYOUT ----
+  let roads = [];
+  let lotNumber = 1;
+  let lots = [];
+
+  if (layoutStyle === 'grid') {
+    const rd = roadDraw; // visual road width
+    // Collector road — horizontal, roughly 42% from top
+    const mainY = devY + devH * 0.42;
+    roads.push({ x: devX, y: mainY, w: devW, h: rd, label: projectName.toUpperCase() + ' DR', type: 'main' });
+    grid.add(devX, mainY, devW, rd, 'road');
+
+    // Entry stub from property line
+    roads.push({ x: ox, y: mainY, w: bufPx, h: rd, type: 'entry' });
+
+    // Calculate side streets — space for lotDepth on each side + road
+    const blockWidth = lotDPx * 2 + gap * 2 + rd;
+    let numBlocks = Math.max(1, Math.floor(devW / (blockWidth + lotWPx * 0.5)));
+    const streetSpacing = devW / (numBlocks + 1);
+
+    for (let i = 0; i < numBlocks; i++) {
+      const sx = devX + streetSpacing * (i + 1) - rd / 2;
+      const topLen = mainY - devY;
+      if (topLen > rd * 2) {
+        roads.push({ x: sx, y: devY, w: rd, h: topLen, label: 'ST ' + String.fromCharCode(65 + i), type: 'side' });
+        grid.add(sx, devY, rd, topLen, 'road');
+      }
+      const botStart = mainY + rd;
+      const botLen = devY + devH - botStart;
+      if (botLen > rd * 2) {
+        roads.push({ x: sx, y: botStart, w: rd, h: botLen, type: 'side' });
+        grid.add(sx, botStart, rd, botLen, 'road');
+      }
+    }
+
+    // ---- PLACE LOTS ----
+    for (const road of roads) {
+      if (road.type === 'entry') continue;
+
+      if (road.w > road.h) {
+        // HORIZONTAL road → lots above and below
+        placeLotRow(road.x, road.y - lotDPx - frontGap, road.w, lotWPx, lotDPx, gap, 'above');
+        placeLotRow(road.x, road.y + road.h + frontGap, road.w, lotWPx, lotDPx, gap, 'below');
+      } else {
+        // VERTICAL road → lots left and right
+        placeLotCol(road.x - lotDPx - frontGap, road.y, road.h, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(road.x + road.w + frontGap, road.y, road.h, lotWPx, lotDPx, gap, 'right');
+      }
+    }
+
+  } else if (layoutStyle === 'loop') {
+    // Loop road — use roadDraw for visual width, roadPx for collision
+    const roadHalf = roadDraw / 2;
+    const loopPad = lotDPx + roadDraw + gap + 5;
+    const loopX = devX + loopPad;
+    const loopY = devY + loopPad;
+    const loopW = devW - loopPad * 2;
+    const loopH = devH - loopPad * 2;
+    const cornerR = Math.min(roadDraw * 3, loopW * 0.1, loopH * 0.1);
+
+    // Collision zones for loop road (thin strips)
+    const rw = roadDraw;
+    grid.add(loopX - rw / 2, loopY - rw / 2, loopW + rw, rw, 'road'); // top
+    grid.add(loopX - rw / 2, loopY + loopH - rw / 2, loopW + rw, rw, 'road'); // bottom
+    grid.add(loopX - rw / 2, loopY - rw / 2, rw, loopH + rw, 'road'); // left
+    grid.add(loopX + loopW - rw / 2, loopY - rw / 2, rw, loopH + rw, 'road'); // right
+
+    // Entry road from left property line
+    const entryY = loopY + loopH / 2 - roadDraw / 2;
+    roads.push({ x: ox, y: entryY, w: loopX - ox + rw, h: roadDraw, type: 'entry' });
+
+    roads.push({ type: 'loop', x: loopX, y: loopY, w: loopW, h: loopH, r: cornerR, roadPx: roadDraw, label: projectName.toUpperCase() + ' LOOP' });
+
+    // Outside lots — proper rectangles facing the road
+    const topLotY = loopY - rw / 2 - frontGap - lotDPx;
+    placeLotRow(loopX + cornerR, topLotY, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'above');
+    const botLotY = loopY + loopH + rw / 2 + frontGap;
+    placeLotRow(loopX + cornerR, botLotY, loopW - cornerR * 2, lotWPx, lotDPx, gap, 'below');
+    const leftLotX = loopX - rw / 2 - frontGap - lotDPx;
+    placeLotColProper(leftLotX, loopY + cornerR, loopH - cornerR * 2, lotDPx, lotWPx, gap);
+    const rightLotX = loopX + loopW + rw / 2 + frontGap;
+    placeLotColProper(rightLotX, loopY + cornerR, loopH - cornerR * 2, lotDPx, lotWPx, gap);
+
+    // Inside loop — add a center street and lots on both sides
+    const insideX = loopX + rw / 2 + gap;
+    const insideY = loopY + rw / 2 + gap;
+    const insideW = loopW - rw - gap * 2;
+    const insideH = loopH - rw - gap * 2;
+
+    // Horizontal center street inside the loop
+    const innerRoadY = insideY + insideH / 2 - roadDraw / 2;
+    roads.push({ x: insideX, y: innerRoadY, w: insideW, h: roadDraw, type: 'inner', label: 'INNER ST' });
+    grid.add(insideX, innerRoadY, insideW, roadDraw, 'road');
+
+    // Lots above inner street
+    const innerTopY = innerRoadY - frontGap - lotDPx;
+    if (innerTopY > insideY) {
+      placeLotRow(insideX, innerTopY, insideW, lotWPx, lotDPx, gap, 'above');
+    }
+    // Lots below inner street
+    const innerBotY = innerRoadY + roadDraw + frontGap;
+    if (innerBotY + lotDPx < insideY + insideH) {
+      placeLotRow(insideX, innerBotY, insideW, lotWPx, lotDPx, gap, 'below');
+    }
+
+  } else if (layoutStyle === 'cul-de-sac') {
+    const rd = roadDraw;
+    const mainY = devY + devH * 0.5 - rd / 2;
+    roads.push({ x: devX, y: mainY, w: devW, h: rd, label: projectName.toUpperCase() + ' DR', type: 'main' });
+    grid.add(devX, mainY, devW, rd, 'road');
+    roads.push({ x: ox, y: mainY, w: bufPx, h: rd, type: 'entry' });
+
+    const bulbR = rd * 1.8;
+    const branchLen = (devH - rd) / 2 - bulbR - 15;
+    const numBranches = Math.max(1, Math.floor(devW / (lotDPx * 2 + rd * 3)));
+    const branchSpacing = devW / (numBranches + 1);
+
+    for (let i = 0; i < numBranches; i++) {
+      const bx = devX + branchSpacing * (i + 1) - rd / 2;
+
+      if (branchLen > lotWPx) {
+        const topY = mainY - branchLen;
+        roads.push({ x: bx, y: topY + bulbR, w: rd, h: branchLen - bulbR, type: 'side' });
+        grid.add(bx, topY + bulbR, rd, branchLen - bulbR, 'road');
+        roads.push({ type: 'bulb', cx: bx + rd / 2, cy: topY + bulbR, r: bulbR });
+        grid.add(bx - bulbR, topY, bulbR * 2 + rd, bulbR * 2, 'road');
+
+        placeLotCol(bx - lotDPx - frontGap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + rd + frontGap, topY + bulbR * 2, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+      }
+
+      if (branchLen > lotWPx) {
+        const botStart = mainY + rd;
+        roads.push({ x: bx, y: botStart, w: rd, h: branchLen - bulbR, type: 'side' });
+        grid.add(bx, botStart, rd, branchLen - bulbR, 'road');
+        roads.push({ type: 'bulb', cx: bx + rd / 2, cy: botStart + branchLen - bulbR, r: bulbR });
+        grid.add(bx - bulbR, botStart + branchLen - bulbR * 2, bulbR * 2 + rd, bulbR * 2, 'road');
+
+        placeLotCol(bx - lotDPx - frontGap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'left');
+        placeLotCol(bx + rd + frontGap, botStart, branchLen - bulbR * 2, lotWPx, lotDPx, gap, 'right');
+      }
+    }
+
+    placeLotRow(devX, mainY - lotDPx - frontGap, devW, lotWPx, lotDPx, gap, 'above');
+    placeLotRow(devX, mainY + rd + frontGap, devW, lotWPx, lotDPx, gap, 'below');
+  }
+
+  // ---- Lot placement helpers (use collision grid) ----
+  function placeLotRow(startX, y, length, lw, lh, g, side) {
+    if (y < oy || y + lh > oy + propH) return;
+    for (let x = startX + sideGap; x + lw <= startX + length - sideGap; x += lw + sideGap) {
+      if (x < devX || x + lw > devX + devW) continue;
+      if (y < devY || y + lh > devY + devH) continue;
+      if (grid.fits(x, y, lw, lh, 2)) {
+        lots.push({ x, y, w: lw, h: lh, num: lotNumber++ });
+        grid.add(x, y, lw, lh, 'lot');
+      }
+    }
+  }
+
+  function placeLotCol(x, startY, length, lw, lh, g, side) {
+    const lotW = lotDPx;
+    const lotH = lotWPx;
+    for (let y = startY + sideGap; y + lotH <= startY + length - sideGap; y += lotH + sideGap) {
+      if (y < devY || y + lotH > devY + devH) continue;
+      if (x < devX || x + lotW > devX + devW) continue;
+      if (grid.fits(x, y, lotW, lotH, 2)) {
+        lots.push({ x, y, w: lotW, h: lotH, num: lotNumber++ });
+        grid.add(x, y, lotW, lotH, 'lot');
+      }
+    }
+  }
+
+  function placeLotColProper(x, startY, length, w, h, g) {
+    for (let y = startY + sideGap; y + h <= startY + length - sideGap; y += h + sideGap) {
+      if (y < devY || y + h > devY + devH) continue;
+      if (x < devX || x + w > devX + devW) continue;
+      if (grid.fits(x, y, w, h, 2)) {
+        lots.push({ x, y, w, h, num: lotNumber++ });
+        grid.add(x, y, w, h, 'lot');
+      }
+    }
+  }
+
+  // =============================================
+  //  DRAWING
+  // =============================================
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Buffer / open space fill
+  ctx.fillStyle = '#e8f5e8';
+  ctx.fillRect(ox, oy, propW, propH);
+
+  // Developable area
+  ctx.fillStyle = '#f8f8f4';
+  ctx.fillRect(devX, devY, devW, devH);
+
+  // ---- Draw roads ----
+  for (const r of roads) {
+    if (r.type === 'loop') {
+      // Draw rounded loop — two parallel lines (road edges) + fill
+      ctx.fillStyle = '#e0e0e0';
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = r.roadPx;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      const cr = r.r;
+      ctx.beginPath();
+      ctx.moveTo(r.x + cr, r.y);
+      ctx.lineTo(r.x + r.w - cr, r.y);
+      ctx.arcTo(r.x + r.w, r.y, r.x + r.w, r.y + cr, cr);
+      ctx.lineTo(r.x + r.w, r.y + r.h - cr);
+      ctx.arcTo(r.x + r.w, r.y + r.h, r.x + r.w - cr, r.y + r.h, cr);
+      ctx.lineTo(r.x + cr, r.y + r.h);
+      ctx.arcTo(r.x, r.y + r.h, r.x, r.y + r.h - cr, cr);
+      ctx.lineTo(r.x, r.y + cr);
+      ctx.arcTo(r.x, r.y, r.x + cr, r.y, cr);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (r.type === 'bulb') {
+      // Cul-de-sac bulb
+      ctx.fillStyle = '#d0d0d0';
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(r.cx, r.cy, r.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#d0d0d0';
+      roundRect(r.x, r.y, r.w, r.h, 2);
+      ctx.fill();
+      // Road center line
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      if (r.w > r.h) {
+        // Horizontal
+        ctx.beginPath();
+        ctx.moveTo(r.x + 4, r.y + r.h / 2);
+        ctx.lineTo(r.x + r.w - 4, r.y + r.h / 2);
+        ctx.stroke();
+      } else {
+        // Vertical
+        ctx.beginPath();
+        ctx.moveTo(r.x + r.w / 2, r.y + 4);
+        ctx.lineTo(r.x + r.w / 2, r.y + r.h - 4);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Road labels
+  ctx.fillStyle = '#666';
+  ctx.font = 'bold 9px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (const r of roads) {
+    if (!r.label) continue;
+    if (r.w > r.h) {
+      ctx.fillText(r.label + '  (' + roadWidth + '\' ROW)', r.x + r.w / 2, r.y + r.h / 2 + 3);
+    } else {
+      ctx.save();
+      ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(r.label, 0, 3);
+      ctx.restore();
+    }
+  }
+
+  // ---- Draw lots with building envelopes and house footprints ----
+  const sbSidePx = setbackSide * scale;
+  const sbFrontPx = setbackFront * scale;
+  const sbRearPx = parseFloat(document.getElementById('setbackRear').value) * scale;
+  const houseWidthFt = parseFloat(document.getElementById('houseWidth').value);
+  const houseWPx = houseWidthFt * scale;
+  const houseDepthPx = houseWPx * 0.6; // typical ranch/2-story proportion
+
+  for (const lot of lots) {
+    // Lot fill — light cream
+    ctx.fillStyle = '#fffde6';
+    ctx.strokeStyle = '#998';
+    ctx.lineWidth = 1;
+    ctx.fillRect(lot.x, lot.y, lot.w, lot.h);
+    ctx.strokeRect(lot.x, lot.y, lot.w, lot.h);
+
+    // Building envelope (setback lines) — dashed red
+    const envX = lot.x + sbSidePx;
+    const envY = lot.y + sbFrontPx;
+    const envW = lot.w - sbSidePx * 2;
+    const envH = lot.h - sbFrontPx - sbRearPx;
+
+    if (envW > 4 && envH > 4) {
+      ctx.strokeStyle = 'rgba(200,80,80,0.4)';
+      ctx.lineWidth = 0.6;
+      ctx.setLineDash([3, 2]);
+      ctx.strokeRect(envX, envY, envW, envH);
+      ctx.setLineDash([]);
+
+      // House footprint — centered in envelope
+      const hw = Math.min(houseWPx, envW - 4);
+      const hh = Math.min(houseDepthPx, envH - 4);
+      if (hw > 6 && hh > 6) {
+        const hx = envX + (envW - hw) / 2;
+        const hy = envY + (envH - hh) * 0.35; // house sits closer to front
+        ctx.fillStyle = 'rgba(180,160,140,0.35)';
+        ctx.strokeStyle = 'rgba(120,100,80,0.5)';
+        ctx.lineWidth = 0.8;
+        ctx.fillRect(hx, hy, hw, hh);
+        ctx.strokeRect(hx, hy, hw, hh);
+
+        // Garage bump
+        const garW = hw * 0.35;
+        const garH = hh * 0.25;
+        ctx.fillRect(hx + hw * 0.1, hy + hh, garW, garH);
+        ctx.strokeRect(hx + hw * 0.1, hy + hh, garW, garH);
+
+        // Driveway line to road
+        ctx.strokeStyle = 'rgba(150,150,150,0.4)';
+        ctx.lineWidth = Math.max(hw * 0.12, 1.5);
+        ctx.beginPath();
+        const driveX = hx + hw * 0.1 + garW / 2;
+        ctx.moveTo(driveX, hy + hh + garH);
+        ctx.lineTo(driveX, lot.y + lot.h);
+        ctx.stroke();
+      }
+    }
+
+    // Lot number — small, bottom-right corner
+    ctx.fillStyle = '#777';
+    const fontSize = Math.max(7, Math.min(9, lot.w * 0.12));
+    ctx.font = fontSize + 'px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(lot.num, lot.x + lot.w - 3, lot.y + lot.h - 2);
+  }
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+
+  // ---- Retention pond ----
+  // Outer glow
+  const pgrd = ctx.createRadialGradient(pondCx, pondCy, 0, pondCx, pondCy, Math.max(pondRx, pondRy) * 1.15);
+  pgrd.addColorStop(0, '#b8ddf0');
+  pgrd.addColorStop(0.7, '#cce8f5');
+  pgrd.addColorStop(1, '#e8f5e8');
+  ctx.fillStyle = pgrd;
+  ctx.beginPath();
+  ctx.ellipse(pondCx, pondCy, pondRx + 4, pondRy + 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Pond body
+  ctx.fillStyle = '#b5d8eb';
+  ctx.strokeStyle = '#6099b0';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(pondCx, pondCy, pondRx, pondRy, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Pond label
+  ctx.fillStyle = '#3a6a80';
+  ctx.font = 'bold 10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('RETENTION', pondCx, pondCy - 4);
+  ctx.fillText('POND', pondCx, pondCy + 9);
+  ctx.font = '8px -apple-system, sans-serif';
+  ctx.fillStyle = '#5a8a9a';
+  ctx.fillText((pondArea / 43560).toFixed(2) + ' ac', pondCx, pondCy + 21);
+
+  // ---- Property boundary ----
+  // Draw property boundary
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 3;
+  
+  if (actualParcelBounds) {
+    // Draw actual parcel shape
+    console.log('Drawing actual parcel boundary with', actualParcelBounds.coordinates.length, 'points');
+    ctx.beginPath();
+    const coords = actualParcelBounds.coordinates;
+    
+    for (let i = 0; i < coords.length; i++) {
+      const [lon, lat] = coords[i];
+      
+      // Convert lat/lon to canvas pixels
+      const pctX = (lon - actualParcelBounds.bounds.minX) / actualParcelBounds.bounds.width;
+      const pctY = (lat - actualParcelBounds.bounds.minY) / actualParcelBounds.bounds.height;
+      const px = ox + pctX * propW;  
+      const py = oy + (1 - pctY) * propH; // flip Y axis
+      
+      if (i === 0) {
+        console.log(`First point: [${lon}, ${lat}] -> (${px.toFixed(1)}, ${py.toFixed(1)})`);
+        ctx.moveTo(px, py);
+      } else {
+        ctx.lineTo(px, py);
+      }
+    }
+    ctx.closePath();
+    ctx.stroke();
+    
+    // Add label
+    ctx.fillStyle = '#2c5aa0';
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ACTUAL PARCEL BOUNDARY', ox + propW/2, oy - 8);
+  } else {
+    // Draw default rectangle
+    ctx.strokeRect(ox, oy, propW, propH);
+  }
+
+  // Buffer line
+  ctx.strokeStyle = '#5a5';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([8, 5]);
+  ctx.strokeRect(devX, devY, devW, devH);
+  ctx.setLineDash([]);
+
+  // Dimension labels
+  ctx.fillStyle = '#333';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  // Top dimension
+  drawDimension(ox, oy - 18, ox + propW, oy - 18, propW_ft.toFixed(0) + '\'');
+  // Left dimension
+  ctx.save();
+  ctx.translate(ox - 18, oy + propH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(propH_ft.toFixed(0) + '\'', 0, 0);
+  ctx.restore();
+
+  // Buffer labels
+  ctx.fillStyle = '#5a5';
+  ctx.font = '9px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  if (bufPx > 30) {
+    ctx.fillText('BUFFER ' + perimBuffer + '\'', ox + bufPx / 2 + 10, oy + propH / 2);
+    ctx.fillText('OPEN SPACE', ox + propW / 2, oy + bufPx / 2 + 2);
+  }
+
+  // ---- North arrow ----
+  const naX = ox + propW + 35, naY = oy + 20;
+  ctx.fillStyle = '#333';
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(naX, naY);
+  ctx.lineTo(naX - 5, naY + 20);
+  ctx.lineTo(naX, naY + 16);
+  ctx.lineTo(naX + 5, naY + 20);
+  ctx.closePath();
+  ctx.fill();
+  ctx.font = 'bold 12px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('N', naX, naY - 4);
+
+  // ---- Scale bar ----
+  const niceScales = [50, 100, 150, 200, 250, 500, 1000];
+  let scaleBarFt = 100;
+  for (const s of niceScales) { if (s * scale > 40 && s * scale < 200) { scaleBarFt = s; break; } }
+  const scaleBarPx = scaleBarFt * scale;
+  const sbX = ox, sbY2 = oy + propH + 24;
+  ctx.fillStyle = '#333';
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  // Bar
+  ctx.fillRect(sbX, sbY2, scaleBarPx / 2, 5);
+  ctx.strokeRect(sbX, sbY2, scaleBarPx, 5);
+  // Ticks
+  ctx.beginPath();
+  ctx.moveTo(sbX, sbY2 - 2); ctx.lineTo(sbX, sbY2 + 7);
+  ctx.moveTo(sbX + scaleBarPx / 2, sbY2 - 2); ctx.lineTo(sbX + scaleBarPx / 2, sbY2 + 7);
+  ctx.moveTo(sbX + scaleBarPx, sbY2 - 2); ctx.lineTo(sbX + scaleBarPx, sbY2 + 7);
+  ctx.stroke();
+  ctx.font = '9px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('0', sbX, sbY2 + 18);
+  ctx.fillText((scaleBarFt / 2) + '\'', sbX + scaleBarPx / 2, sbY2 + 18);
+  ctx.fillText(scaleBarFt + '\'', sbX + scaleBarPx, sbY2 + 18);
+  ctx.font = '8px -apple-system, sans-serif';
+  ctx.fillText('1" = ' + Math.round(1 / scale * 96) + '\'', sbX + scaleBarPx / 2, sbY2 + 30);
+
+  // ---- TITLE BLOCK ----
+  const tbY = 730;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, tbY, canvas.width, titleH + 20);
+
+  // Outer border
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(12, tbY + 4, canvas.width - 24, titleH);
+
+  // Column dividers
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#555';
+  const col1 = canvas.width * 0.42, col2 = canvas.width * 0.72;
+  ctx.beginPath();
+  ctx.moveTo(col1, tbY + 4); ctx.lineTo(col1, tbY + titleH + 4);
+  ctx.moveTo(col2, tbY + 4); ctx.lineTo(col2, tbY + titleH + 4);
+  // Horizontal line in left column
+  ctx.moveTo(12, tbY + 52); ctx.lineTo(col1, tbY + 52);
+  ctx.stroke();
+
+  // Left col — project info
+  ctx.fillStyle = '#111';
+  ctx.font = 'bold 18px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(projectName.toUpperCase(), 24, tbY + 30);
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.fillStyle = '#444';
+  ctx.fillText('PRELIMINARY CONCEPT PLAN — NOT FOR CONSTRUCTION', 24, tbY + 46);
+  ctx.fillStyle = '#111';
+  ctx.font = '11px -apple-system, sans-serif';
+  if (ownerName) ctx.fillText('Developer: ' + ownerName, 24, tbY + 70);
+  ctx.fillText('Total Area: ' + totalAcres.toFixed(2) + ' Acres  |  ' + lots.length + ' Lots  |  ' + (lots.length / totalAcres).toFixed(1) + ' lots/ac', 24, tbY + 88);
+
+  // Middle col — specs
+  const mx = col1 + 16;
+  ctx.fillStyle = '#111';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText('Lot Dimensions: ' + lotWidth + '\' × ' + lotDepth + '\' (' + (lotWidth * lotDepth).toLocaleString() + ' SF)', mx, tbY + 24);
+  ctx.fillText('Road ROW: ' + roadWidth + '\'', mx, tbY + 40);
+  const setbackRear = parseFloat(document.getElementById('setbackRear').value);
+  ctx.fillText('Setbacks: ' + setbackFront + '\' front / ' + setbackRear + '\' rear / ' + setbackSide + '\' side', mx, tbY + 56);
+  ctx.fillText('Perimeter Buffer: ' + perimBuffer + '\'', mx, tbY + 72);
+  ctx.fillText('Stormwater: ' + (pondPct * 100).toFixed(0) + '%  (' + (pondArea / 43560).toFixed(2) + ' ac)', mx, tbY + 88);
+
+  // Right col — branding + date
+  const rx = col2 + 16;
+  ctx.fillStyle = '#00809a';
+  ctx.font = 'bold 15px -apple-system, sans-serif';
+  ctx.fillText('Land Takeoffs', rx, tbY + 28);
+  ctx.fillStyle = '#666';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText('landtakeoffs.com', rx, tbY + 44);
+  ctx.fillText('Site Analysis & Estimation', rx, tbY + 58);
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  ctx.fillText('Date: ' + today, rx, tbY + 78);
+  ctx.fillText('Layout: ' + layoutStyle.charAt(0).toUpperCase() + layoutStyle.slice(1), rx, tbY + 92);
+
+  // ---- Update summary panel ----
+  const netDev = totalAcres * 0.52;
+  const openAc = totalAcres * 0.15;
+  const roadAc = totalAcres * 0.22;
+  const pondAc = totalAcres * pondPct;
+  const density = lots.length / totalAcres;
+
+  document.getElementById('summary').innerHTML = `
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Total Lots</span><b style="color:var(--cyan)">${lots.length}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Density</span><b>${density.toFixed(1)} lots/ac</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Net Developable</span><b>${netDev.toFixed(1)} ac (52%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Roads / ROW</span><b>${roadAc.toFixed(1)} ac (22%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Open Space</span><b>${openAc.toFixed(1)} ac (15%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span>Stormwater</span><b>${pondAc.toFixed(1)} ac (${(pondPct * 100).toFixed(0)}%)</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Lot Size</span><b>${lotWidth}' × ${lotDepth}' (${(lotWidth * lotDepth).toLocaleString()} sf)</b></div>
+  `;
+}
+
+// ---- Drawing helpers ----
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function drawDimension(x1, y1, x2, y2, label) {
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+  ctx.moveTo(x1, y1 - 4); ctx.lineTo(x1, y1 + 4);
+  ctx.moveTo(x2, y2 - 4); ctx.lineTo(x2, y2 + 4);
+  ctx.stroke();
+  ctx.fillStyle = '#333';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, (x1 + x2) / 2, y1 - 4);
+}
+
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+  const name = document.getElementById('projectName').value || 'concept-plan';
+  pdf.save(name.replace(/\s+/g, '-').toLowerCase() + '-concept-plan.pdf');
+}
+
+function downloadPNG() {
+  const link = document.createElement('a');
+  const name = document.getElementById('projectName').value || 'concept-plan';
+  link.download = name.replace(/\s+/g, '-').toLowerCase() + '-concept-plan.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// Generate on load
+generatePlan();
+</script>
+</body>
+</html>

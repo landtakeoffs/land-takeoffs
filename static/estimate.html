@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Land Takeoffs — Bid Estimate</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2300d4ff'/%3E%3Cstop offset='100%25' stop-color='%2300ff88'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0f'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18 L52 44 Z' fill='url(%23g)' opacity='0.15'/%3E%3Ccircle cx='52' cy='18' r='3.5' fill='%2300ff88'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0a0a0f; --panel: #12121a; --border: #1e1e2e;
+    --cyan: #00d4ff; --green: #00ff88; --orange: #ff8800;
+    --red: #ff4444; --text: #e0e0e0; --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'SF Pro', sans-serif; background: var(--bg); color: var(--text); }
+
+  header { background: var(--panel); border-bottom: 1px solid var(--border);
+           display: flex; align-items: center; padding: 0 24px; height: 60px; gap: 16px; }
+  header h1 { font-size: 1.3em; color: var(--cyan); font-weight: 600; }
+  header a { color: var(--muted); text-decoration: none; font-size: 0.85em; }
+  header a:hover { color: var(--cyan); }
+  header .spacer { flex: 1; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  /* Project info */
+  .project-bar { display: flex; gap: 16px; align-items: end; margin-bottom: 24px; flex-wrap: wrap; }
+  .project-bar .field { flex: 1; min-width: 200px; }
+  .project-bar label { display: block; font-size: 0.75em; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .project-bar input { width: 100%; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border);
+                       border-radius: 8px; color: var(--text); font-size: 1em; }
+  .project-bar input:focus { outline: none; border-color: var(--cyan); }
+
+  /* Section tabs */
+  .tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 16px; background: transparent; border: none; color: var(--muted); cursor: pointer;
+         font-size: 0.85em; font-weight: 500; white-space: nowrap; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+  .tab .tab-total { font-size: 0.8em; color: var(--green); margin-left: 6px; }
+
+  /* Table */
+  .section { display: none; }
+  .section.active { display: block; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 12px; font-size: 0.75em; color: var(--muted); text-transform: uppercase;
+       letter-spacing: 0.5px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+  tr:hover { background: rgba(0,212,255,0.03); }
+  .item-code { color: var(--muted); font-size: 0.85em; font-family: monospace; }
+  .item-desc { font-size: 0.9em; }
+  .item-unit { color: var(--muted); font-size: 0.85em; text-align: center; }
+
+  td input[type="number"] { width: 100%; padding: 6px 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+                            border-radius: 6px; color: var(--text); font-size: 0.9em; text-align: right;
+                            font-variant-numeric: tabular-nums; }
+  td input:focus { outline: none; border-color: var(--cyan); background: rgba(0,212,255,0.05); }
+  .amount { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--green); }
+  .amount.zero { color: var(--muted); }
+
+  /* Section total row */
+  .section-total td { border-top: 2px solid var(--border); font-weight: 700; font-size: 1em; padding-top: 12px; }
+
+  /* Summary bar */
+  .summary-bar { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--border);
+                 padding: 16px 24px; display: flex; align-items: center; gap: 24px; margin-top: 24px; }
+  .summary-item { text-align: center; }
+  .summary-item .label { font-size: 0.7em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-item .value { font-size: 1.4em; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .summary-item .value.total { color: var(--cyan); }
+  .summary-spacer { flex: 1; }
+
+  .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 0.95em;
+         font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: var(--cyan); color: #000; }
+  .btn-primary:hover { background: #33ddff; }
+  .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+  /* Add row */
+  .add-row { display: flex; gap: 8px; margin-top: 12px; }
+  .add-row input { flex: 1; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border);
+                   border-radius: 6px; color: var(--text); font-size: 0.85em; }
+  .add-row button { padding: 8px 16px; background: rgba(0,212,255,0.1); border: 1px solid var(--cyan);
+                    border-radius: 6px; color: var(--cyan); cursor: pointer; font-size: 0.85em; white-space: nowrap; }
+
+  .toast { position: fixed; bottom: 80px; right: 24px; background: var(--panel); border: 1px solid var(--cyan);
+           border-radius: 8px; padding: 12px 20px; z-index: 2000; display: none; font-size: 0.9em; }
+  .toast.show { display: block; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Calc panel spreadsheet rows */
+  .calc-section-title { color: var(--cyan); font-size: 0.9em; font-weight: 600; text-transform: uppercase;
+                        letter-spacing: 0.5px; padding: 12px 18px 8px; border-bottom: 1px solid var(--border); }
+  .calc-row { display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04);
+              padding: 0; min-height: 48px; }
+  .calc-row:hover { background: rgba(0,212,255,0.03); }
+  .calc-row label { flex: 1; padding: 10px 18px; font-size: 0.95em; color: var(--muted); margin: 0; }
+  .calc-row input, .calc-row select { width: 160px; padding: 9px 12px; background: rgba(0,0,0,0.3);
+                                       border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+                                       font-size: 0.95em; text-align: right; margin-right: 18px; }
+  .calc-row select { text-align: left; width: 180px; }
+  .calc-row input:focus, .calc-row select:focus { outline: none; border-color: var(--cyan); background: rgba(0,212,255,0.05); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .project-bar { flex-direction: column; }
+    .tabs { flex-wrap: nowrap; }
+    .summary-bar { flex-wrap: wrap; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <img src="/static/logo.svg" alt="Land Takeoffs" width="32" height="32" style="flex-shrink:0;"/>
+    <h1>Land Takeoffs</h1>
+  </div>
+  <a href="/">← Back to Map</a>
+  <span class="spacer"></span>
+  <span style="color: var(--muted); font-size: 0.85em;">Bid Estimate Builder</span>
+</header>
+
+<div class="container">
+  <div class="project-bar">
+    <div class="field" style="flex:2;">
+      <label>Project Name</label>
+      <input type="text" id="projectName" placeholder="Your Subdivision" oninput="updateSummary()">
+    </div>
+    <div class="field">
+      <label>Location</label>
+      <input type="text" id="projectLocation" placeholder="Fountain Inn, SC">
+    </div>
+    <div class="field">
+      <label>Developer</label>
+      <input type="text" id="projectDeveloper" placeholder="All Star Developer">
+    </div>
+  </div>
+
+  <!-- Parametric Calculator -->
+  <div id="calcPanel" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;overflow:hidden;">
+    <div onclick="toggleCalc()" style="padding:14px 20px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+      <h3 style="font-size:1.05em;color:var(--cyan);margin:0;">⚡ Site Parameters</h3>
+      <span id="calcToggle" style="color:var(--muted);">▲</span>
+    </div>
+    <div id="calcBody" style="display:block;">
+      <div style="border-top:1px solid var(--border);">
+        <!-- Site Parameters -->
+        <div class="calc-row"><label>Total Site Acreage</label><input type="number" id="siteAcres" value="" min="0.5" step="0.1" placeholder="From parcel" onchange="recalcLots()"></div>
+        <div class="calc-row"><label>Average Lot Size (SF)</label><input type="number" id="lotSizeSF" value="12000" min="2000" step="500" onchange="recalcLots()">
+        </div>
+        <div class="calc-row"><label>Sewer Type</label>
+          <select id="sewerType"><option value="public">Public Sewer</option><option value="septic" selected>Septic (No Sewer)</option></select></div>
+        <div class="calc-row"><label>Sidewalk</label>
+          <select id="sidewalkType"><option value="both">Both Sides</option><option value="one" selected>One Side</option><option value="none">None</option></select></div>
+        <div class="calc-row"><label>Curb & Gutter</label>
+          <select id="curbType"><option value="yes" selected>Yes</option><option value="no">No</option></select></div>
+
+        <!-- Auto-calculated land breakdown -->
+        <div style="border-top:1px solid var(--border);padding:14px 14px 6px;">
+          <div style="font-size:0.8em;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Calculated Land Breakdown</div>
+        </div>
+        <div class="calc-row" style="background:rgba(0,212,255,0.03);">
+          <label>Roads & ROW (~22%)</label>
+          <span id="calcRoadAcres" style="width:160px;text-align:right;margin-right:18px;font-size:0.95em;color:var(--text);font-weight:600;">—</span>
+        </div>
+        <div class="calc-row" style="background:rgba(0,212,255,0.03);">
+          <label>Open Space (~15%)</label>
+          <span id="calcOpenAcres" style="width:160px;text-align:right;margin-right:18px;font-size:0.95em;color:var(--text);font-weight:600;">—</span>
+        </div>
+        <div class="calc-row" style="background:rgba(0,212,255,0.03);">
+          <label>Stormwater/Detention (~7%)</label>
+          <span id="calcPondAcres" style="width:160px;text-align:right;margin-right:18px;font-size:0.95em;color:var(--text);font-weight:600;">—</span>
+        </div>
+        <div class="calc-row" style="background:rgba(0,212,255,0.03);">
+          <label>Buffers & Easements (~4%)</label>
+          <span id="calcBufferAcres" style="width:160px;text-align:right;margin-right:18px;font-size:0.95em;color:var(--text);font-weight:600;">—</span>
+        </div>
+        <div class="calc-row" style="background:rgba(0,255,136,0.06);border-top:2px solid var(--border);">
+          <label style="color:var(--green);font-weight:600;">Net Developable Lot Area (~52%)</label>
+          <span id="calcNetAcres" style="width:160px;text-align:right;margin-right:18px;font-size:0.95em;color:var(--green);font-weight:700;">—</span>
+        </div>
+        <div class="calc-row" style="background:rgba(0,255,136,0.06);">
+          <label style="color:var(--green);font-weight:600;">Estimated Number of Lots</label>
+          <span id="calcNumLots" style="width:160px;text-align:right;margin-right:18px;font-size:1.2em;color:var(--green);font-weight:700;">—</span>
+        </div>
+      </div>
+      <div style="padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:16px;">
+        <button class="btn btn-primary" onclick="autoEstimate()" style="max-width:320px;">
+          ⚡ Calculate Full Estimate
+        </button>
+        <span style="font-size:0.75em;color:var(--muted);">
+          Generates all quantities across every section using industry standards.
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="sections"></div>
+</div>
+
+<div class="summary-bar">
+  <div class="summary-item">
+    <div class="label">Line Items</div>
+    <div class="value" id="totalItems">0</div>
+  </div>
+  <div class="summary-item">
+    <div class="label">With Quantities</div>
+    <div class="value" id="filledItems" style="color:var(--green)">0</div>
+  </div>
+  <div class="summary-item">
+    <div class="label">Cost / Lot</div>
+    <div class="value" id="costPerLot" style="color:var(--orange);">—</div>
+  </div>
+  <div class="summary-item">
+    <div class="label">Cost / Acre</div>
+    <div class="value" id="costPerAcre" style="color:var(--orange);">—</div>
+  </div>
+  <div class="summary-spacer"></div>
+  <div class="summary-item">
+    <div class="label">Grand Total</div>
+    <div class="value total" id="grandTotal">$0</div>
+  </div>
+  <button class="btn btn-secondary" onclick="loadPenningtonRidge()" title="Load Pennington Ridge quantities as example">
+    📂 Load Example
+  </button>
+  <button class="btn btn-primary" onclick="downloadEstimate()">
+    📥 Download .xlsx
+  </button>
+  <button class="btn btn-primary" onclick="goToProforma()" style="background:var(--green);" id="proformaBtn">
+    💰 Go to Proforma →
+  </button>
+</div>
+
+<div style="max-width:1100px;margin:0 auto;padding:12px 24px 24px;">
+  <p style="font-size:0.75em;color:var(--muted);text-align:center;line-height:1.6;">
+    ⚠️ <strong>Disclaimer:</strong> All estimates generated by Land Takeoffs are for informational and planning purposes only.
+    Quantities are calculated using industry rules of thumb and may not reflect actual site conditions.
+    Always verify with a licensed general contractor, professional engineer, or surveyor before bidding or construction.
+    Land Takeoffs is not responsible for any decisions made based on these estimates.
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let sections = {};
+let activeSection = null;
+
+// Track if template is loaded
+let templateLoaded = false;
+let templateLoadPromise = null;
+
+// Load template from API
+async function init() {
+  if (templateLoaded) return Promise.resolve();
+  if (templateLoadPromise) return templateLoadPromise;
+  
+  templateLoadPromise = (async () => {
+    try {
+      const resp = await fetch('/api/estimate/template');
+      sections = await resp.json();
+      templateLoaded = true;
+      renderTabs();
+      renderSections();
+      // Activate first tab
+      const firstKey = Object.keys(sections)[0];
+      activateTab(firstKey);
+      updateSummary();
+      console.log('🔵 Template loaded, sections available:', Object.keys(sections));
+    } catch (err) {
+      showToast('❌ Failed to load template: ' + err.message);
+      throw err;
+    }
+  })();
+  
+  return templateLoadPromise;
+}
+
+function renderTabs() {
+  const tabsDiv = document.getElementById('tabs');
+  tabsDiv.innerHTML = Object.keys(sections).map(name =>
+    `<button class="tab" data-section="${name}" onclick="activateTab('${name}')">
+      ${name}<span class="tab-total" id="tab-total-${css(name)}"></span>
+    </button>`
+  ).join('');
+}
+
+function css(name) { return name.replace(/[^a-zA-Z0-9]/g, '_'); }
+
+function activateTab(name) {
+  activeSection = name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.section === name));
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.dataset.section === name));
+}
+
+function renderSections() {
+  const container = document.getElementById('sections');
+  container.innerHTML = Object.entries(sections).map(([name, items]) => `
+    <div class="section" data-section="${name}">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">Item</th>
+            <th>Description</th>
+            <th style="width:60px;text-align:center">Unit</th>
+            <th style="width:120px;text-align:right">Quantity</th>
+            <th style="width:130px;text-align:right">Unit Price</th>
+            <th style="width:130px;text-align:right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item, i) => renderRow(name, item, i)).join('')}
+        </tbody>
+        <tfoot>
+          <tr class="section-total">
+            <td colspan="4"></td>
+            <td style="text-align:right;color:var(--muted)">Section Total</td>
+            <td class="amount" id="section-total-${css(name)}">$0</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="add-row">
+        <input type="text" placeholder="New item description..." id="new-desc-${css(name)}">
+        <input type="text" placeholder="Unit" style="max-width:80px" id="new-unit-${css(name)}">
+        <button onclick="addRow('${name}')">+ Add Item</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderRow(section, item, index) {
+  const skey = css(section);
+  const amt = (item.Qty || 0) * (item['Unit Price'] || 0);
+  return `<tr>
+    <td class="item-code">${item.Item}</td>
+    <td class="item-desc">${item.Description}</td>
+    <td class="item-unit">${item.Unit}</td>
+    <td><input type="number" value="${item.Qty || ''}" min="0" step="any"
+        placeholder="0" onchange="updateQty('${section}', ${index}, this.value)"></td>
+    <td><input type="number" value="${item['Unit Price'] || ''}" min="0" step="0.01"
+        placeholder="0.00" onchange="updatePrice('${section}', ${index}, this.value)"
+        style="text-align:right"></td>
+    <td class="amount ${amt === 0 ? 'zero' : ''}" id="amt-${skey}-${index}">${formatMoney(amt)}</td>
+  </tr>`;
+}
+
+function updateQty(section, index, val) {
+  sections[section][index].Qty = parseFloat(val) || 0;
+  recalcRow(section, index);
+  updateSummary();
+}
+
+function updatePrice(section, index, val) {
+  sections[section][index]['Unit Price'] = parseFloat(val) || 0;
+  recalcRow(section, index);
+  updateSummary();
+}
+
+function recalcRow(section, index) {
+  const item = sections[section][index];
+  const amt = (item.Qty || 0) * (item['Unit Price'] || 0);
+  const el = document.getElementById(`amt-${css(section)}-${index}`);
+  el.textContent = formatMoney(amt);
+  el.className = 'amount' + (amt === 0 ? ' zero' : '');
+}
+
+function updateSummary() {
+  let grandTotal = 0;
+  let totalItems = 0;
+  let filledItems = 0;
+
+  Object.entries(sections).forEach(([name, items]) => {
+    let sectionTotal = 0;
+    items.forEach(item => {
+      totalItems++;
+      const amt = (item.Qty || 0) * (item['Unit Price'] || 0);
+      sectionTotal += amt;
+      if (item.Qty > 0) filledItems++;
+    });
+    grandTotal += sectionTotal;
+
+    // Update section total
+    const stEl = document.getElementById(`section-total-${css(name)}`);
+    if (stEl) stEl.textContent = formatMoney(sectionTotal);
+
+    // Update tab badge
+    const tabEl = document.getElementById(`tab-total-${css(name)}`);
+    if (tabEl) tabEl.textContent = sectionTotal > 0 ? formatMoney(sectionTotal) : '';
+  });
+
+  document.getElementById('totalItems').textContent = totalItems;
+  document.getElementById('filledItems').textContent = filledItems;
+  document.getElementById('grandTotal').textContent = formatMoney(grandTotal);
+
+  // Per-lot and per-acre costs
+  const lots = _lastCalcLots || parseInt(document.getElementById('calcNumLots')?.textContent) || 0;
+  const acres = parseFloat(document.getElementById('siteAcres')?.value) || 0;
+  document.getElementById('costPerLot').textContent = lots > 0 ? formatMoney(Math.round(grandTotal / lots)) : '—';
+  document.getElementById('costPerAcre').textContent = acres > 0 ? formatMoney(Math.round(grandTotal / acres)) : '—';
+}
+
+function addRow(section) {
+  const skey = css(section);
+  const desc = document.getElementById(`new-desc-${skey}`).value.trim();
+  const unit = document.getElementById(`new-unit-${skey}`).value.trim() || 'EA';
+  if (!desc) return;
+
+  const items = sections[section];
+  const prefix = items[0]?.Item?.split('-')[0] || 'XX';
+  const num = items.length + 1;
+  items.push({ Item: `${prefix}-${num}`, Description: desc, Unit: unit, Qty: 0, 'Unit Price': 0 });
+
+  renderSections();
+  activateTab(section);
+  updateSummary();
+  document.getElementById(`new-desc-${skey}`).value = '';
+  document.getElementById(`new-unit-${skey}`).value = '';
+}
+
+async function downloadEstimate() {
+  const projectName = document.getElementById('projectName').value || 'Untitled Project';
+  showToast('📋 Generating workbook...');
+
+  try {
+    const resp = await fetch('/api/estimate/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_name: projectName, sections }),
+    });
+
+    if (!resp.ok) throw new Error('Server error');
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName.replace(/\s+/g, '_')}_Estimate.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✅ Estimate downloaded!');
+  } catch (err) {
+    showToast('❌ ' + err.message);
+  }
+}
+
+// Pennington Ridge example data
+function loadPenningtonRidge() {
+  document.getElementById('projectName').value = 'Pennington Ridge Subdivision';
+  document.getElementById('projectLocation').value = 'Pennington Road, Fountain Inn, SC';
+  document.getElementById('projectDeveloper').value = 'Clear Path Development, LLC';
+
+  const penData = {
+    "Earthwork": { "EW-1": 2, "EW-2": 8500, "EW-3": 3200, "EW-4": 3200, "EW-5": 18000 },
+    "Erosion Control": { "EC-1": 2, "EC-2": 4500, "EC-3": 12, "EC-4": 2500, "EC-5": 5, "EC-6": 5 },
+    "Storm Drainage": { "SD-1": 650, "SD-2": 550, "SD-3": 400, "SD-4": 10, "SD-5": 8, "SD-6": 3, "SD-7": 1, "SD-8": 2500, "SD-9": 3000 },
+    "Water": { "W-1": 1900, "W-2": 4, "W-3": 6, "W-4": 1, "W-5": 0 },
+    "Sanitary Sewer": {},
+    "Paving & Concrete": { "PC-1": 3960, "PC-2": 1320, "PC-3": 2400, "PC-4": 4800, "PC-5": 6, "PC-6": 0 },
+    "Striping & Signage": { "ST-1": 3600, "ST-2": 2, "ST-3": 4, "ST-4": 8 },
+    "Fencing & Misc": { "FM-1": 800, "FM-2": 2 },
+  };
+
+  // Also update unit prices to match Pennington Ridge actuals
+  const penPrices = {
+    "Earthwork": { "EW-1": 6500, "EW-2": 5.0, "EW-3": 2.5, "EW-4": 3.0, "EW-5": 0.75 },
+    "Paving & Concrete": { "PC-1": 40.0, "PC-2": 26.0 },
+  };
+
+  Object.entries(penData).forEach(([section, items]) => {
+    if (!sections[section]) return;
+    sections[section].forEach(item => {
+      if (items[item.Item] !== undefined) item.Qty = items[item.Item];
+    });
+  });
+  Object.entries(penPrices).forEach(([section, items]) => {
+    if (!sections[section]) return;
+    sections[section].forEach(item => {
+      if (items[item.Item] !== undefined) item['Unit Price'] = items[item.Item];
+    });
+  });
+
+  renderSections();
+  activateTab(activeSection);
+  updateSummary();
+  showToast('📂 Loaded Pennington Ridge example data');
+}
+
+function formatMoney(val) {
+  if (val === 0) return '$0';
+  if (val >= 1000000) return '$' + (val / 1000000).toFixed(2) + 'M';
+  return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ---- Parametric Calculator ----
+let calcOpen = true;
+let _lastCalcLots = 0;
+
+function toggleCalc() {
+  calcOpen = !calcOpen;
+  document.getElementById('calcBody').style.display = calcOpen ? 'block' : 'none';
+  document.getElementById('calcToggle').textContent = calcOpen ? '▲' : '▼';
+  if (calcOpen) recalcLots(); // refresh numbers when opening
+}
+
+// Land allocation percentages (industry standards for SC residential subdivisions)
+const LAND_ALLOC = {
+  roads: 0.22,      // Roads & ROW — 22%
+  openSpace: 0.15,  // Open space / common area — 15%
+  stormwater: 0.07, // Detention/retention ponds — 7%
+  buffers: 0.04,    // Utility easements, stream buffers — 4%
+  // Net developable = 1 - 0.22 - 0.15 - 0.07 - 0.04 = 0.52 (52%)
+};
+const NET_DEVELOPABLE_PCT = 1 - LAND_ALLOC.roads - LAND_ALLOC.openSpace - LAND_ALLOC.stormwater - LAND_ALLOC.buffers;
+
+function recalcLots() {
+  const acres = parseFloat(document.getElementById('siteAcres').value) || 0;
+  const lotSizeSF = parseInt(document.getElementById('lotSizeSF').value) || 12000;
+
+  if (acres <= 0) {
+    ['calcRoadAcres','calcOpenAcres','calcPondAcres','calcBufferAcres','calcNetAcres','calcNumLots'].forEach(
+      id => document.getElementById(id).textContent = '—');
+    _lastCalcLots = 0;
+    return;
+  }
+
+  const roadAc = acres * LAND_ALLOC.roads;
+  const openAc = acres * LAND_ALLOC.openSpace;
+  const pondAc = acres * LAND_ALLOC.stormwater;
+  const bufferAc = acres * LAND_ALLOC.buffers;
+  const netAc = acres * NET_DEVELOPABLE_PCT;
+  const netSF = netAc * 43560;
+  const numLots = Math.floor(netSF / lotSizeSF);
+
+  document.getElementById('calcRoadAcres').textContent = roadAc.toFixed(2) + ' ac';
+  document.getElementById('calcOpenAcres').textContent = openAc.toFixed(2) + ' ac';
+  document.getElementById('calcPondAcres').textContent = pondAc.toFixed(2) + ' ac';
+  document.getElementById('calcBufferAcres').textContent = bufferAc.toFixed(2) + ' ac';
+  document.getElementById('calcNetAcres').textContent = netAc.toFixed(2) + ' ac';
+  document.getElementById('calcNumLots').textContent = numLots + ' lots';
+
+  _lastCalcLots = numLots;
+}
+
+// Read URL params from map page (parcel data)
+function loadParcelFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  
+  // First try sessionStorage (from map flow)
+  const parcelData = sessionStorage.getItem('selectedParcel');
+  if (parcelData) {
+    try {
+      const parcel = JSON.parse(parcelData);
+      if (parcel.acres) {
+        document.getElementById('siteAcres').value = parseFloat(parcel.acres).toFixed(2);
+      }
+      if (parcel.address) {
+        document.getElementById('projectName').value = parcel.address;
+      }
+      
+      // Show terrain results if available
+      const terrainResults = sessionStorage.getItem('terrainResults');
+      if (terrainResults) {
+        const results = JSON.parse(terrainResults);
+        console.log('Terrain analysis results:', results);
+        // Could display this in a banner or info panel
+      }
+      
+      recalcLots();
+      calcOpen = true;
+      document.getElementById('calcBody').style.display = 'block';
+      document.getElementById('calcToggle').textContent = '▲';
+      return;
+    } catch (e) {
+      console.error('Failed to load parcel from session:', e);
+    }
+  }
+  
+  // Fallback to URL params
+  if (params.has('acres')) {
+    document.getElementById('siteAcres').value = parseFloat(params.get('acres')).toFixed(2);
+  }
+  if (params.has('subdiv') && params.get('subdiv')) {
+    document.getElementById('projectName').value = params.get('subdiv');
+  }
+  if (params.has('acres')) {
+    recalcLots();
+    calcOpen = true;
+    document.getElementById('calcBody').style.display = 'block';
+    document.getElementById('calcToggle').textContent = '▲';
+  }
+}
+
+function autoEstimate() {
+  // ---- Read inputs ----
+  const acres = parseFloat(document.getElementById('siteAcres').value) || 0;
+  const lotSizeSF = parseInt(document.getElementById('lotSizeSF').value) || 12000;
+  const sewer = document.getElementById('sewerType').value;
+  const sidewalk = document.getElementById('sidewalkType').value;
+  const curb = document.getElementById('curbType').value;
+
+  if (acres <= 0) {
+    showToast('⚠️ Enter the site acreage first');
+    return;
+  }
+
+  // Recalc lots from land allocation
+  recalcLots();
+  const lots = _lastCalcLots;
+  if (lots <= 0) {
+    showToast('⚠️ Lot size too large for this acreage — reduce lot size');
+    return;
+  }
+
+  // Derived from land allocation
+  const padSF = lotSizeSF;
+  const roadPerLot = 175;  // industry standard: ~175 LF road per lot
+  const paveWidth = 24;    // standard 24' face-to-face
+  const topsoilIn = 6;     // standard 6" topsoil strip
+  const hasPond = true;    // always assume detention required
+  const avgPipe = '18';    // default to 18" RCP
+  const cutCY = 0;         // will use rule of thumb
+  const fillCY = 0;
+  const pondAcres = acres * LAND_ALLOC.stormwater;
+  const pondPerimeterLF = Math.round(Math.sqrt(pondAcres * 43560) * 4);
+  const pondFence = pondPerimeterLF;
+  const pondGates = 2;
+
+  // ---- Derived Calculations ----
+  // Roads
+  const totalRoadLF = lots * roadPerLot;
+  const roadAreaSF = totalRoadLF * paveWidth;
+  const roadAreaSY = Math.round(roadAreaSF / 9);
+  const intersections = Math.max(1, Math.round(totalRoadLF / 1200));
+  const sidewalkSides = sidewalk === 'both' ? 2 : sidewalk === 'one' ? 1 : 0;
+  const sidewalkSF = totalRoadLF * 4 * sidewalkSides; // 4' wide concrete sidewalk
+
+  // Site areas
+  const disturbedAcres = Math.round(acres * 0.85 * 10) / 10; // 85% of site gets disturbed
+  const totalPadSF = lots * padSF;
+  const totalPadSY = Math.round(totalPadSF / 9);
+
+  // Earthwork
+  const topsoilCY = Math.round(disturbedAcres * 43560 * (topsoilIn / 12) / 27);
+  const fineGradeSY = roadAreaSY + totalPadSY; // roads + pads
+  // If no terrain data provided, estimate ~350 CY/lot as a rule of thumb
+  const massCutFill = Math.max(cutCY, fillCY, Math.round(lots * 350));
+  const netExport = cutCY > fillCY ? Math.round(cutCY - fillCY) : 0;
+  const netImport = fillCY > cutCY ? Math.round(fillCY - cutCY) : 0;
+
+  // Perimeter (rough: treat site as a rectangle with 2:1 aspect ratio)
+  const siteSF = acres * 43560;
+  const siteWidth = Math.sqrt(siteSF / 2);
+  const siteLength = siteWidth * 2;
+  const perimeterLF = Math.round((siteWidth + siteLength) * 2);
+
+  // Storm drainage: pipe runs alongside roads, plus laterals to inlets
+  const stormPipeLF = Math.round(totalRoadLF * 0.85); // ~85% of road length needs storm pipe
+  const inlets = Math.max(4, Math.round(totalRoadLF / 300)); // 1 inlet every 300 LF (SC standard)
+  const stormMH = Math.max(2, Math.round(stormPipeLF / 400)); // junction every 400 LF
+  // Pipe size distribution based on user selection
+  const pipeSplit15 = avgPipe === '15' ? 0.55 : avgPipe === '18' ? 0.25 : 0.10;
+  const pipeSplit18 = avgPipe === '15' ? 0.30 : avgPipe === '18' ? 0.45 : 0.30;
+  const pipeSplit24 = 1 - pipeSplit15 - pipeSplit18;
+
+  // Pond sizing based on stormwater allocation: ~2000 CY/acre of pond, ~1500 SY grading
+  const pondExcavCY = hasPond ? Math.round(pondAcres * 2000) : 0;
+  const pondGradeSY = hasPond ? Math.round(pondAcres * 1500) : 0;
+
+  // Water: main runs full road length, hydrants every 500' (fire code), valves at tees
+  const hydrants = Math.max(2, Math.round(totalRoadLF / 500));
+  const gateValves = hydrants + intersections + 1; // at each hydrant tee, each intersection, plus main tie-in
+
+  // Sewer: gravity main along roads, manholes at bends/junctions, lateral per lot
+  const sewerMH = sewer === 'public' ? Math.max(2, Math.round(totalRoadLF / 350)) : 0;
+
+  // Erosion control matting: slopes around ponds + any road cut banks
+  // ~3 SY per LF of slope perimeter. Conservative estimate = pond perimeter + 15% of site perimeter
+  const pondPerimeter = hasPond ? Math.round(Math.sqrt(pondExcavCY * 27 / 5) * 4) : 0; // rough
+  const mattingSY = Math.round((pondPerimeter + perimeterLF * 0.15) * 3);
+
+  // Striping: centerline + edge lines where required
+  const stripingLF = totalRoadLF; // centerline
+
+  // ---- Apply quantities to every line item ----
+  function setQty(section, itemCode, qty) {
+    if (!sections[section]) return;
+    const item = sections[section].find(i => i.Item === itemCode);
+    if (item) item.Qty = Math.round(qty);
+  }
+
+  // === EARTHWORK ===
+  setQty('Earthwork', 'EW-1', disturbedAcres);           // Clearing & Grubbing — per disturbed acre
+  setQty('Earthwork', 'EW-2', massCutFill);               // Mass Excavation/Fill — total earthwork volume
+  setQty('Earthwork', 'EW-3', topsoilCY);                 // Topsoil Strip — depth × disturbed area
+  setQty('Earthwork', 'EW-4', topsoilCY);                 // Topsoil Respread — same volume back
+  setQty('Earthwork', 'EW-5', fineGradeSY);               // Fine Grading — all road + pad areas
+  setQty('Earthwork', 'EW-6', roadAreaSY);                // Proof Rolling — road subgrade only
+  setQty('Earthwork', 'EW-7', netExport + netImport);     // Import/Export — net difference hauled
+
+  // === EROSION CONTROL ===
+  setQty('Erosion Control', 'EC-1', Math.max(2, intersections)); // Construction Entrances — at each access point
+  setQty('Erosion Control', 'EC-2', perimeterLF);                // Silt Fence — full site perimeter
+  setQty('Erosion Control', 'EC-3', inlets);                      // Inlet Protection — every catch basin
+  setQty('Erosion Control', 'EC-4', mattingSY);                   // Erosion Matting — slopes & pond banks
+  setQty('Erosion Control', 'EC-5', disturbedAcres);              // Temp Seeding — all disturbed area
+  setQty('Erosion Control', 'EC-6', disturbedAcres);              // Permanent Seeding — all disturbed area
+
+  // === STORM DRAINAGE ===
+  setQty('Storm Drainage', 'SD-1', Math.round(stormPipeLF * pipeSplit15)); // 15" RCP
+  setQty('Storm Drainage', 'SD-2', Math.round(stormPipeLF * pipeSplit18)); // 18" RCP
+  setQty('Storm Drainage', 'SD-3', Math.round(stormPipeLF * pipeSplit24)); // 24" RCP
+  setQty('Storm Drainage', 'SD-4', inlets);                                 // Catch Basins — 1 per 300 LF road
+  setQty('Storm Drainage', 'SD-5', stormMH);                                // Storm Manholes — junctions
+  setQty('Storm Drainage', 'SD-6', hasPond ? 3 : 1);                        // Headwalls — outfalls
+  setQty('Storm Drainage', 'SD-7', hasPond ? 1 : 0);                        // Outlet Control — pond riser
+  setQty('Storm Drainage', 'SD-8', pondExcavCY);                            // Pond Excavation
+  setQty('Storm Drainage', 'SD-9', pondGradeSY);                            // Pond Grading
+
+  // === WATER ===
+  setQty('Water', 'W-1', totalRoadLF);       // 8" Water Main — runs along all roads
+  setQty('Water', 'W-2', hydrants);           // Fire Hydrants — every 500' (fire code)
+  setQty('Water', 'W-3', gateValves);         // Gate Valves — at hydrants, tees, intersections
+  setQty('Water', 'W-4', 1);                  // Tapping Sleeve — 1 connection to existing main
+  setQty('Water', 'W-5', lots);               // Water Services — 1 per lot
+
+  // === SANITARY SEWER ===
+  if (sewer === 'public') {
+    setQty('Sanitary Sewer', 'SS-1', totalRoadLF);  // Sewer Main — gravity along roads
+    setQty('Sanitary Sewer', 'SS-2', sewerMH);       // Manholes — every 350' + at bends
+    setQty('Sanitary Sewer', 'SS-3', lots);           // Service Laterals — 1 per lot
+    setQty('Sanitary Sewer', 'SS-4', 1);              // Tie-in — 1 connection to existing system
+  } else {
+    setQty('Sanitary Sewer', 'SS-1', 0);
+    setQty('Sanitary Sewer', 'SS-2', 0);
+    setQty('Sanitary Sewer', 'SS-3', 0);
+    setQty('Sanitary Sewer', 'SS-4', 0);
+  }
+
+  // === PAVING & CONCRETE ===
+  setQty('Paving & Concrete', 'PC-1', roadAreaSY);                      // Base Course — all road area
+  setQty('Paving & Concrete', 'PC-2', roadAreaSY);                      // Surface Course — all road area
+  setQty('Paving & Concrete', 'PC-3', curb === 'yes' ? totalRoadLF * 2 : 0); // Curb & Gutter — both sides
+  setQty('Paving & Concrete', 'PC-4', sidewalkSF);                      // Sidewalk — width × sides × road length
+  setQty('Paving & Concrete', 'PC-5', Math.max(2, intersections * 4));  // ADA Ramps — 4 per intersection min
+  setQty('Paving & Concrete', 'PC-6', lots);                            // Driveway Aprons — 1 per lot
+
+  // === STRIPING & SIGNAGE ===
+  setQty('Striping & Signage', 'ST-1', stripingLF);          // Centerline Striping
+  setQty('Striping & Signage', 'ST-2', intersections * 2);   // Stop Bars — 2 per intersection
+  setQty('Striping & Signage', 'ST-3', intersections);        // Pavement Arrows — 1 per intersection
+  setQty('Striping & Signage', 'ST-4', intersections * 2 + Math.ceil(lots / 8) + 2); // Signs — stop signs, street name signs (~1 per 8 lots), speed limit signs
+
+  // === FENCING & MISC ===
+  setQty('Fencing & Misc', 'FM-1', pondFence);  // Pond Fence
+  setQty('Fencing & Misc', 'FM-2', pondGates);  // Gates
+
+  // Mobilization: industry standard ~5-8% of direct costs
+  // Bonds & Insurance: ~2-3% of total
+  // Calculate after all other items are set
+  const directCost = Object.values(sections).flat()
+    .filter(i => i.Item !== 'FM-3' && i.Item !== 'FM-4')
+    .reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+
+  // Set Mobilization as a lump sum (~4% of direct costs)
+  const mobItem = sections['Fencing & Misc']?.find(i => i.Item === 'FM-3');
+  if (mobItem) { mobItem.Qty = 1; mobItem['Unit Price'] = Math.round(directCost * 0.04); }
+
+  // Set Bonds & Insurance (~2% of direct costs)
+  const bondsItem = sections['Fencing & Misc']?.find(i => i.Item === 'FM-4');
+  if (bondsItem) { bondsItem.Qty = 1; bondsItem['Unit Price'] = Math.round(directCost * 0.02); }
+
+  // ---- Re-render ----
+  renderSections();
+  activateTab(activeSection);
+  updateSummary();
+
+  // Summary toast with breakdown
+  const grand = Object.values(sections).flat().reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+  const perLot = Math.round(grand / lots);
+  showToast(`⚡ ${lots}-lot estimate: ${formatMoney(grand)} total (${formatMoney(perLot)}/lot) — review & adjust`);
+}
+
+async function goToProforma() {
+  console.log('🔵 ESTIMATE: goToProforma called');
+  
+  const acres = parseFloat(document.getElementById('siteAcres')?.value) || 0;
+  
+  // If no acres, can't proceed
+  if (acres <= 0) {
+    alert('Please enter site acreage first');
+    return;
+  }
+  
+  // CRITICAL: Wait for template to load
+  if (!templateLoaded) {
+    console.log('🔵 ESTIMATE: Template not loaded yet, waiting...');
+    try {
+      await init();
+    } catch (e) {
+      alert('Failed to load estimate template: ' + e.message);
+      return;
+    }
+  }
+  
+  console.log('🔵 ESTIMATE: Template loaded, sections available:', Object.keys(sections).length, 'categories');
+  
+  // Check if estimate has been generated (has quantities)
+  const hasEstimate = Object.values(sections).flat().some(i => (i.Qty || 0) > 0);
+  
+  if (!hasEstimate) {
+    console.log('⚠️ ESTIMATE: No quantities found, auto-generating estimate...');
+    // Auto-generate using the calculator
+    autoEstimate();
+    // Let autoEstimate complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log('🔵 ESTIMATE: autoEstimate complete, now saving data...');
+    saveProformaData();
+    return;
+  }
+  
+  // Estimate already generated, save it
+  saveProformaData();
+}
+
+function saveProformaData() {
+  console.log('🔵 ESTIMATE: saveProformaData() called');
+  console.log('🔵 ESTIMATE: sections object has keys:', Object.keys(sections));
+  
+  // DEBUG: Log each section
+  Object.entries(sections).forEach(([name, items]) => {
+    const total = items.reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+    const itemsWithQty = items.filter(i => (i.Qty || 0) > 0);
+    console.log(`  ${name}: $${total.toLocaleString()} (${itemsWithQty.length}/${items.length} items with qty)`);
+  });
+  
+  const grandTotal = Object.values(sections).flat()
+    .reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+  
+  const acres = parseFloat(document.getElementById('siteAcres')?.value) || 0;
+  const lots = parseInt(document.getElementById('calcNumLots')?.textContent) || 0;
+  
+  // Build data for each of the 8 categories
+  const estimateData = {
+    grandTotal: grandTotal,
+    acres: acres,
+    lots: lots,
+    perLot: lots > 0 ? Math.round(grandTotal / lots) : 0,
+    sections: Object.entries(sections).map(([name, items]) => {
+      const total = items.reduce((s, i) => s + (i.Qty || 0) * (i['Unit Price'] || 0), 0);
+      return { name, total };
+    })
+  };
+  
+  console.log('🔵 ESTIMATE: Estimate data ready:', estimateData);
+  console.log('🔵 ESTIMATE: Categories with totals:');
+  estimateData.sections.forEach(s => console.log(`  ${s.name}: $${s.total.toLocaleString()}`));
+  
+  // Save to localStorage
+  localStorage.setItem('estimateData', JSON.stringify(estimateData));
+  console.log('🔵 ESTIMATE: ✅ Saved to localStorage');
+  
+  // Also save to sessionStorage as backup
+  sessionStorage.setItem('estimateData', JSON.stringify(estimateData));
+  
+  // Redirect to proforma
+  let proformaURL = '';
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    proformaURL = 'http://localhost:5003/';
+  } else if (window.location.hostname.includes('railway.app')) {
+    proformaURL = '/residential-proforma';
+  } else {
+    proformaURL = `${window.location.protocol}//${window.location.hostname}:5003/`;
+  }
+  
+  console.log('🔵 ESTIMATE: Redirecting to proforma...');
+  window.location.href = proformaURL;
+}
+
+init();
+loadParcelFromURL();
+</script>
+</body>
+</html>

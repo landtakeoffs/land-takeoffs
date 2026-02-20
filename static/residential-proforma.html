@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Residential Development Proforma</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        h1 {
+            grid-column: 1 / -1;
+            font-size: 2rem;
+            color: #00ffff;
+            margin-bottom: 20px;
+        }
+        .panel {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        h2 {
+            font-size: 1.3rem;
+            color: #00ffff;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        label {
+            font-size: 0.95rem;
+            color: #b0b0b0;
+        }
+        input[type="number"] {
+            background: #0a0a0a;
+            border: 1px solid #444;
+            color: #00ffff;
+            padding: 10px 14px;
+            border-radius: 4px;
+            width: 180px;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #00ffff;
+        }
+        button {
+            background: #00ffff;
+            color: #0a0a0a;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #00cccc;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #222;
+        }
+        .metric-label {
+            font-size: 1rem;
+            color: #b0b0b0;
+        }
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #00ffff;
+        }
+        .metric.highlight {
+            background: #0a2020;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .metric.highlight .metric-value {
+            font-size: 1.5rem;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏘️ Residential Development Proforma</h1>
+        
+        <div class="panel">
+            <h2>Project Inputs</h2>
+            
+            <div class="section">
+                <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Site Info</h3>
+                <div class="input-row">
+                    <label>Total Acres</label>
+                    <input type="number" id="acres" value="10" step="0.1">
+                </div>
+                <div class="input-row">
+                    <label>Number of Lots</label>
+                    <input type="number" id="lot_count" value="50" step="1">
+                </div>
+                <div class="input-row">
+                    <label>Lot Sale Price ($)</label>
+                    <input type="number" id="lot_price" value="75000" step="1000">
+                </div>
+                <div class="input-row">
+                    <label>Land Cost ($/acre)</label>
+                    <input type="number" id="land_cost_per_acre" value="50000" step="1000">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3 style="color: #888; font-size: 1.2rem; margin-bottom: 12px; font-weight: 600;">Hard Costs (from Estimate)</h3>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Earthwork (Mass Grading)</label>
+                    <input type="number" id="earthwork" value="0" step="1000">
+                </div>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Erosion Control</label>
+                    <input type="number" id="erosion_control" value="0" step="1000">
+                </div>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Storm Drainage</label>
+                    <input type="number" id="storm_drainage" value="0" step="1000">
+                </div>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Sanitary Sewer</label>
+                    <input type="number" id="sanitary_sewer" value="0" step="1000">
+                </div>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Water</label>
+                    <input type="number" id="water" value="0" step="1000">
+                </div>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Paving & Concrete</label>
+                    <input type="number" id="paving_concrete" value="0" step="1000">
+                </div>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Striping & Signage</label>
+                    <input type="number" id="striping_signage" value="0" step="1000">
+                </div>
+                <div class="input-row">
+                    <label style="font-size: 1.1rem;">Fencing & Misc</label>
+                    <input type="number" id="fencing_misc" value="0" step="1000">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Soft Costs</h3>
+                <div class="input-row">
+                    <label>Engineering ($)</label>
+                    <input type="number" id="engineering" value="120000" step="1000">
+                </div>
+                <div class="input-row">
+                    <label>Permits ($)</label>
+                    <input type="number" id="permits" value="45000" step="1000">
+                </div>
+                <div class="input-row">
+                    <label>Legal ($)</label>
+                    <input type="number" id="legal" value="35000" step="1000">
+                </div>
+                <div class="input-row">
+                    <label>Marketing ($)</label>
+                    <input type="number" id="marketing" value="25000" step="1000">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Financing & Timeline</h3>
+                <div class="input-row">
+                    <label>Sales Commission (%)</label>
+                    <input type="number" id="sales_commission_pct" value="5.0" step="0.1">
+                </div>
+                <div class="input-row">
+                    <label>Construction Loan Rate (%)</label>
+                    <input type="number" id="construction_loan_rate" value="7.5" step="0.1">
+                </div>
+                <div class="input-row">
+                    <label>Development Months</label>
+                    <input type="number" id="development_months" value="12" step="1">
+                </div>
+                <div class="input-row">
+                    <label>Sales Period Months</label>
+                    <input type="number" id="sales_months" value="18" step="1">
+                </div>
+                <div class="input-row">
+                    <label>Lots Sold/Month</label>
+                    <input type="number" id="lots_per_month" value="3" step="0.5">
+                </div>
+            </div>
+            
+            <button onclick="calculate()">Calculate Proforma</button>
+        </div>
+        
+        <div class="panel">
+            <h2>Financial Summary</h2>
+            <div id="results">
+                <p style="color: #666; text-align: center; margin-top: 40px;">
+                    Enter project details and click Calculate
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function formatCurrency(num) {
+            return '$' + num.toLocaleString('en-US', {maximumFractionDigits: 0});
+        }
+        
+        // Format number inputs with commas
+        function formatNumberInput(input) {
+            const value = input.value.replace(/,/g, '');
+            if (value && !isNaN(value) && parseFloat(value) !== 0) {
+                input.value = parseFloat(value).toLocaleString('en-US');
+            }
+        }
+        
+        function unformatNumberInput(input) {
+            input.value = input.value.replace(/,/g, '');
+        }
+        
+        // Auto-fill from estimate data
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🟢 PROFORMA: DOMContentLoaded fired');
+            console.log('🟢 PROFORMA: Page loaded, checking sessionStorage...');
+            
+            const estimateData = sessionStorage.getItem('estimateData');
+            const parcelData = sessionStorage.getItem('selectedParcel');
+            
+            console.log('🟢 PROFORMA: estimateData exists?', !!estimateData);
+            console.log('🟢 PROFORMA: Raw estimateData:', estimateData);
+            
+            if (estimateData) {
+                try {
+                    const data = JSON.parse(estimateData);
+                    
+                    console.log('🟢 PROFORMA: Parsed data:', data);
+                    console.log('🟢 PROFORMA: Sections:', data.sections);
+                    
+                    // Fill in basic info
+                    if (data.acres) document.getElementById('acres').value = data.acres;
+                    if (data.lots) document.getElementById('lot_count').value = data.lots;
+                    
+                    // Map estimate sections to proforma line items - EXACT MATCH
+                    // Section names from estimate: Earthwork, Erosion Control, Storm Drainage, Sanitary Sewer, Water, Paving & Concrete, Striping & Signage, Fencing & Misc
+                    
+                    data.sections.forEach(section => {
+                        const total = Math.round(section.total);
+                        console.log('🔵 Processing section:', section.name, '→ $' + total.toLocaleString());
+                        
+                        let inputField = null;
+                        let fieldId = null;
+                        switch(section.name) {
+                            case 'Earthwork':
+                                fieldId = 'earthwork';
+                                inputField = document.getElementById('earthwork');
+                                break;
+                            case 'Erosion Control':
+                                fieldId = 'erosion_control';
+                                inputField = document.getElementById('erosion_control');
+                                break;
+                            case 'Storm Drainage':
+                                fieldId = 'storm_drainage';
+                                inputField = document.getElementById('storm_drainage');
+                                break;
+                            case 'Sanitary Sewer':
+                                fieldId = 'sanitary_sewer';
+                                inputField = document.getElementById('sanitary_sewer');
+                                break;
+                            case 'Water':
+                                fieldId = 'water';
+                                inputField = document.getElementById('water');
+                                break;
+                            case 'Paving & Concrete':
+                                fieldId = 'paving_concrete';
+                                inputField = document.getElementById('paving_concrete');
+                                break;
+                            case 'Striping & Signage':
+                                fieldId = 'striping_signage';
+                                inputField = document.getElementById('striping_signage');
+                                break;
+                            case 'Fencing & Misc':
+                                fieldId = 'fencing_misc';
+                                inputField = document.getElementById('fencing_misc');
+                                break;
+                        }
+                        
+                        if (inputField) {
+                            console.log('✅ Found field:', fieldId, 'Setting value:', total);
+                            inputField.value = total;  // Don't format yet - just set the number
+                            console.log('✅ Value after set:', inputField.value);
+                        } else {
+                            console.log('❌ Field NOT FOUND:', fieldId, 'for section:', section.name);
+                        }
+                    });
+                    
+                    console.log('✅ Auto-filled all 8 hard cost categories from estimate');
+                    
+                    // Debug: Check what's actually in the fields now
+                    console.log('🔍 FINAL CHECK - Field values:');
+                    console.log('  earthwork:', document.getElementById('earthwork').value);
+                    console.log('  erosion_control:', document.getElementById('erosion_control').value);
+                    console.log('  storm_drainage:', document.getElementById('storm_drainage').value);
+                    console.log('  sanitary_sewer:', document.getElementById('sanitary_sewer').value);
+                    console.log('  water:', document.getElementById('water').value);
+                    console.log('  paving_concrete:', document.getElementById('paving_concrete').value);
+                    console.log('  striping_signage:', document.getElementById('striping_signage').value);
+                    console.log('  fencing_misc:', document.getElementById('fencing_misc').value);
+                    
+                    // Show success message
+                    const totalFilled = data.sections.reduce((sum, s) => sum + s.total, 0);
+                    const banner = document.createElement('div');
+                    banner.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#00ffff;color:#0a0a0a;padding:12px 24px;border-radius:8px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                    banner.textContent = '✅ Loaded! Acres: ' + data.acres + ', Lots: ' + data.lots + ', Total: $' + totalFilled.toLocaleString();
+                    document.body.appendChild(banner);
+                    setTimeout(() => banner.remove(), 5000);
+                    
+                    // Auto-calculate after filling - wait a bit longer
+                    setTimeout(() => {
+                        console.log('🧮 Running calculate()...');
+                        calculate();
+                    }, 500);
+                    
+                    // NOW add formatting listeners (after data is loaded)
+                    document.querySelectorAll('input[type="number"]').forEach(input => {
+                        input.addEventListener('blur', () => formatNumberInput(input));
+                        input.addEventListener('focus', () => unformatNumberInput(input));
+                    });
+                    
+                } catch (e) {
+                    console.error('🔴 PROFORMA: Failed to load estimate data:', e);
+                    alert('ERROR loading data: ' + e.message);
+                }
+            } else {
+                console.log('🟡 PROFORMA: No estimate data found in sessionStorage');
+                const banner = document.createElement('div');
+                banner.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#ff6600;color:#fff;padding:12px 24px;border-radius:8px;font-weight:600;z-index:9999;';
+                banner.textContent = '⚠️ No estimate data found - enter manually';
+                document.body.appendChild(banner);
+                setTimeout(() => banner.remove(), 4000);
+            }
+            
+            if (parcelData) {
+                try {
+                    const parcel = JSON.parse(parcelData);
+                    console.log('Parcel data available:', parcel);
+                } catch (e) {
+                    console.error('Failed to load parcel data:', e);
+                }
+            }
+        });
+        
+        function getNumericValue(id) {
+            return parseFloat(document.getElementById(id).value.replace(/,/g, '')) || 0;
+        }
+        
+        function calculate() {
+            const data = {
+                acres: getNumericValue('acres'),
+                lot_count: getNumericValue('lot_count'),
+                lot_price: getNumericValue('lot_price'),
+                land_cost_per_acre: getNumericValue('land_cost_per_acre'),
+                earthwork: getNumericValue('earthwork'),
+                erosion_control: getNumericValue('erosion_control'),
+                storm_drainage: getNumericValue('storm_drainage'),
+                sanitary_sewer: getNumericValue('sanitary_sewer'),
+                water: getNumericValue('water'),
+                paving_concrete: getNumericValue('paving_concrete'),
+                striping_signage: getNumericValue('striping_signage'),
+                fencing_misc: getNumericValue('fencing_misc'),
+                engineering: getNumericValue('engineering'),
+                permits: getNumericValue('permits'),
+                legal: getNumericValue('legal'),
+                marketing: getNumericValue('marketing'),
+                sales_commission_pct: getNumericValue('sales_commission_pct'),
+                construction_loan_rate: getNumericValue('construction_loan_rate'),
+                development_months: getNumericValue('development_months'),
+                sales_months: getNumericValue('sales_months'),
+                lots_per_month: getNumericValue('lots_per_month')
+            };
+            
+            fetch('/api/residential-proforma/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(result => {
+                document.getElementById('results').innerHTML = `
+                    <div class="section">
+                        <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Development Costs</h3>
+                        <div class="metric">
+                            <span class="metric-label">Land Acquisition</span>
+                            <span class="metric-value">${formatCurrency(result.land_cost)}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Hard Costs</span>
+                            <span class="metric-value">${formatCurrency(result.hard_costs)}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Soft Costs</span>
+                            <span class="metric-value">${formatCurrency(result.soft_costs)}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Construction Interest</span>
+                            <span class="metric-value">${formatCurrency(result.construction_interest)}</span>
+                        </div>
+                        <div class="metric highlight">
+                            <span class="metric-label">Total Development Cost</span>
+                            <span class="metric-value">${formatCurrency(result.total_cost)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Revenue</h3>
+                        <div class="metric">
+                            <span class="metric-label">Gross Revenue</span>
+                            <span class="metric-value">${formatCurrency(result.gross_revenue)}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Sales Commissions</span>
+                            <span class="metric-value">(${formatCurrency(result.sales_commissions)})</span>
+                        </div>
+                        <div class="metric highlight">
+                            <span class="metric-label">Net Revenue</span>
+                            <span class="metric-value">${formatCurrency(result.net_revenue)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Profitability</h3>
+                        <div class="metric highlight">
+                            <span class="metric-label">Gross Profit</span>
+                            <span class="metric-value">${formatCurrency(result.gross_profit)}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Profit Margin</span>
+                            <span class="metric-value">${result.profit_margin.toFixed(1)}%</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">ROI</span>
+                            <span class="metric-value">${result.roi.toFixed(1)}%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Per-Lot Metrics</h3>
+                        <div class="metric">
+                            <span class="metric-label">Cost per Lot</span>
+                            <span class="metric-value">${formatCurrency(result.cost_per_lot)}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Profit per Lot</span>
+                            <span class="metric-value">${formatCurrency(result.profit_per_lot)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3 style="color: #888; font-size: 1rem; margin-bottom: 10px;">Timeline</h3>
+                        <div class="metric">
+                            <span class="metric-label">Total Project Duration</span>
+                            <span class="metric-value">${result.total_months} months</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Breakeven Month</span>
+                            <span class="metric-value">Month ${result.months_to_breakeven}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complete Flow Test</title>
+    <style>
+        body { font-family: monospace; padding: 40px; background: #f0f0f0; }
+        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; background: #00d4ff; border: none; border-radius: 8px; }
+        .section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        pre { background: #1a1a1a; color: #00ffff; padding: 20px; border-radius: 8px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔬 End-to-End Flow Test</h1>
+    
+    <div class="section">
+        <h2>Step 1: Simulate Estimate Page</h2>
+        <p>This mimics what happens when you click "Go to Proforma" on the estimate page.</p>
+        <button onclick="saveEstimateData()">💾 Save Estimate Data to sessionStorage</button>
+        <pre id="saveResult"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: Check sessionStorage</h2>
+        <button onclick="checkStorage()">🔍 Check What's in sessionStorage</button>
+        <pre id="storageResult"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>Step 3: Go to Proforma</h2>
+        <p>This will navigate to the proforma page. It should auto-load the data.</p>
+        <button onclick="goToProforma()">➡️ Go to Residential Proforma</button>
+    </div>
+    
+    <script>
+        function saveEstimateData() {
+            // Simulate exactly what the estimate page does
+            const estimateData = {
+                grandTotal: 1750000,
+                acres: 12.3,
+                lots: 52,
+                perLot: 33654,
+                sections: [
+                    {name: 'Earthwork', total: 285000},
+                    {name: 'Erosion Control', total: 62000},
+                    {name: 'Storm Drainage', total: 195000},
+                    {name: 'Sanitary Sewer', total: 245000},
+                    {name: 'Water', total: 168000},
+                    {name: 'Paving & Concrete', total: 425000},
+                    {name: 'Striping & Signage', total: 28000},
+                    {name: 'Fencing & Misc', total: 342000}
+                ]
+            };
+            
+            console.log('🔵 TEST: Saving estimate data:', estimateData);
+            sessionStorage.setItem('estimateData', JSON.stringify(estimateData));
+            
+            // Verify it saved
+            const readBack = sessionStorage.getItem('estimateData');
+            if (readBack) {
+                const parsed = JSON.parse(readBack);
+                document.getElementById('saveResult').textContent = '✅ SUCCESS! Saved:\n\n' + JSON.stringify(parsed, null, 2);
+            } else {
+                document.getElementById('saveResult').textContent = '❌ FAILED! Data not found after save.';
+            }
+        }
+        
+        function checkStorage() {
+            const data = sessionStorage.getItem('estimateData');
+            const result = document.getElementById('storageResult');
+            
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    result.textContent = '✅ Data found!\n\n';
+                    result.textContent += 'Acres: ' + parsed.acres + '\n';
+                    result.textContent += 'Lots: ' + parsed.lots + '\n';
+                    result.textContent += 'Grand Total: $' + parsed.grandTotal.toLocaleString() + '\n\n';
+                    result.textContent += 'Sections:\n';
+                    parsed.sections.forEach(s => {
+                        result.textContent += '  - ' + s.name + ': $' + s.total.toLocaleString() + '\n';
+                    });
+                } catch (e) {
+                    result.textContent = '❌ Data exists but failed to parse: ' + e.message;
+                }
+            } else {
+                result.textContent = '⚠️  No data in sessionStorage.\n\nClick "Save Estimate Data" first!';
+            }
+        }
+        
+        function goToProforma() {
+            const data = sessionStorage.getItem('estimateData');
+            if (!data) {
+                alert('⚠️  No data saved! Click "Save Estimate Data" first.');
+                return;
+            }
+            window.location.href = '/residential-proforma';
+        }
+        
+        // Auto-check on load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkStorage();
+        });
+    </script>
+</body>
+</html>
