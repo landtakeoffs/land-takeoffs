@@ -1,7 +1,14 @@
 """Flask API for civil engineering site analysis."""
 
 import logging
-from flask import Flask, jsonify, request
+import json
+import os
+import smtplib
+from datetime import datetime
+from pathlib import Path
+from email.message import EmailMessage
+from flask import Flask, jsonify, request, send_file
+from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
 from config import config
@@ -30,6 +37,105 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config["SECRET_KEY"] = config.SECRET_KEY
 app.json.sort_keys = False  # preserve dict key order
 CORS(app)
+
+UPLOAD_DIR = Path(__file__).parent / "uploads" / "plans"
+SUBMISSIONS_DIR = UPLOAD_DIR / "submissions"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+SUBMISSIONS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _smtp_config():
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    smtp_from = os.getenv("SMTP_FROM", smtp_user or "noreply@landtakeoffs.local")
+    return smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from
+
+
+def _send_email(message: EmailMessage) -> tuple[bool, str]:
+    smtp_host, smtp_port, smtp_user, smtp_pass, _ = _smtp_config()
+    if not smtp_host or not smtp_user or not smtp_pass:
+        return False, "SMTP not configured"
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(message)
+        return True, "Email sent"
+    except Exception as exc:
+        logger.exception("Failed sending email")
+        return False, f"Email failed: {exc}"
+
+
+def _send_plan_intake_email(submission: dict, saved_path: Path) -> tuple[bool, str]:
+    """Send intake notification email if SMTP env vars are configured."""
+    _, _, _, _, smtp_from = _smtp_config()
+    review_to = os.getenv("PLAN_REVIEW_TO", "natejarvisone@gmail.com")
+
+    msg = EmailMessage()
+    msg["Subject"] = f"[Plan Upload] {submission.get('project','(No project)')} — {submission.get('name','Unknown')}"
+    msg["From"] = smtp_from
+    msg["To"] = review_to
+    msg.set_content(
+        "New civil plan upload received.\n\n"
+        f"Submission ID: {submission.get('id','')}\n"
+        f"Name: {submission.get('name','')}\n"
+        f"Email: {submission.get('email','')}\n"
+        f"Phone: {submission.get('phone','')}\n"
+        f"Company: {submission.get('company','')}\n"
+        f"Project: {submission.get('project','')}\n"
+        f"Scope notes: {submission.get('scope','')}\n"
+        f"File: {saved_path.name}\n"
+        f"Submitted at: {submission.get('submitted_at','')}\n"
+    )
+
+    # Attach uploaded PDF for review
+    try:
+        msg.add_attachment(
+            saved_path.read_bytes(),
+            maintype="application",
+            subtype="pdf",
+            filename=saved_path.name,
+        )
+    except Exception:
+        logger.exception("Failed attaching uploaded PDF to intake email")
+
+    return _send_email(msg)
+
+
+def _send_status_email_to_client(submission: dict, status: str, note: str = "") -> tuple[bool, str]:
+    """Notify client when status changes."""
+    _, _, _, _, smtp_from = _smtp_config()
+    to_email = submission.get("email")
+    if not to_email:
+        return False, "No client email"
+
+    msg = EmailMessage()
+    msg["Subject"] = f"Plan Review Update — {submission.get('project','Your Project')}"
+    msg["From"] = smtp_from
+    msg["To"] = to_email
+    body = (
+        f"Hello {submission.get('name','')},\n\n"
+        f"Your plan review status is now: {status}.\n"
+    )
+    if note:
+        body += f"\nNote: {note}\n"
+    body += "\nThank you,\nLand Takeoffs"
+    msg.set_content(body)
+    return _send_email(msg)
+
+
+def _submission_path(submission_id: str) -> Path:
+    return SUBMISSIONS_DIR / f"{submission_id}.json"
+
+
+def _require_admin_token() -> bool:
+    expected = os.getenv("ADMIN_TOKEN", "").strip()
+    if not expected:
+        return True
+    provided = request.headers.get("X-Admin-Token", "") or request.args.get("token", "")
+    return provided == expected
 
 
 @app.route("/api/debug", methods=["GET"])
@@ -404,6 +510,139 @@ def unified_page():
 def concept_plan_page():
     """Serve the concept plan generator."""
     return app.send_static_file("concept-plan.html")
+
+
+@app.route("/plans-upload", methods=["GET"])
+def plans_upload_page():
+    """Serve the civil plans upload page."""
+    return app.send_static_file("plans-upload.html")
+
+
+@app.route("/api/plans-upload", methods=["POST"])
+def plans_upload_api():
+    """Handle plan-upload form submissions and notify reviewer."""
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    company = (request.form.get("company") or "").strip()
+    project = (request.form.get("project") or "").strip()
+    scope = (request.form.get("scope") or "").strip()
+    file = request.files.get("plans")
+
+    if not name or not email or not project:
+        return jsonify({"ok": False, "error": "Missing required fields"}), 400
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "PDF file is required"}), 400
+
+    filename = secure_filename(file.filename)
+    if not filename.lower().endswith(".pdf"):
+        return jsonify({"ok": False, "error": "Only PDF files are allowed"}), 400
+
+    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    saved_name = f"{ts}_{filename}"
+    saved_path = UPLOAD_DIR / saved_name
+    file.save(saved_path)
+
+    submission = {
+        "id": ts,
+        "status": "received",
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "company": company,
+        "project": project,
+        "scope": scope,
+        "file": saved_name,
+        "submitted_at": datetime.utcnow().isoformat() + "Z",
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "source_ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "user_agent": request.headers.get("User-Agent", "")
+    }
+
+    # Persist intake log (JSONL + per-submission JSON)
+    log_path = UPLOAD_DIR / "submissions.jsonl"
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(submission) + "\n")
+    _submission_path(ts).write_text(json.dumps(submission, indent=2), encoding="utf-8")
+
+    emailed, msg = _send_plan_intake_email(submission, saved_path)
+
+    return jsonify({
+        "ok": True,
+        "message": "We’ve received your file. You’ll receive an email with the estimate and pro forma within 24 hours from one of our licensed contractors.",
+        "emailNotification": emailed,
+        "status": msg,
+        "submissionId": ts
+    })
+
+
+@app.route("/admin/plan-submissions", methods=["GET"])
+def plans_admin_page():
+    """Serve admin review page for plan submissions."""
+    return app.send_static_file("plans-admin.html")
+
+
+@app.route("/api/plans-upload/submissions", methods=["GET"])
+def plans_upload_submissions_api():
+    """List plan upload submissions for admin review."""
+    if not _require_admin_token():
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    items = []
+    for p in sorted(SUBMISSIONS_DIR.glob("*.json"), reverse=True):
+        try:
+            items.append(json.loads(p.read_text(encoding="utf-8")))
+        except Exception:
+            logger.exception("Failed reading submission file: %s", p)
+
+    return jsonify({"ok": True, "count": len(items), "submissions": items})
+
+
+@app.route("/api/plans-upload/<submission_id>/status", methods=["POST"])
+def plans_upload_update_status_api(submission_id: str):
+    """Update submission status and optionally notify client by email."""
+    if not _require_admin_token():
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    p = _submission_path(submission_id)
+    if not p.exists():
+        return jsonify({"ok": False, "error": "Submission not found"}), 404
+
+    payload = request.get_json(silent=True) or {}
+    new_status = (payload.get("status") or "").strip().lower()
+    note = (payload.get("note") or "").strip()
+    notify_client = bool(payload.get("notifyClient", True))
+    if not new_status:
+        return jsonify({"ok": False, "error": "Status is required"}), 400
+
+    data = json.loads(p.read_text(encoding="utf-8"))
+    data["status"] = new_status
+    data["status_note"] = note
+    data["updated_at"] = datetime.utcnow().isoformat() + "Z"
+    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    emailed = False
+    email_status = "Client notification skipped"
+    if notify_client:
+        emailed, email_status = _send_status_email_to_client(data, new_status, note)
+
+    return jsonify({"ok": True, "submission": data, "clientNotified": emailed, "emailStatus": email_status})
+
+
+@app.route("/api/plans-upload/<submission_id>/file", methods=["GET"])
+def plans_upload_get_file_api(submission_id: str):
+    """Download original uploaded plan PDF for review."""
+    if not _require_admin_token():
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    p = _submission_path(submission_id)
+    if not p.exists():
+        return jsonify({"ok": False, "error": "Submission not found"}), 404
+    data = json.loads(p.read_text(encoding="utf-8"))
+    file_path = UPLOAD_DIR / data.get("file", "")
+    if not file_path.exists():
+        return jsonify({"ok": False, "error": "File not found"}), 404
+    return send_file(file_path, as_attachment=True, download_name=file_path.name)
 
 
 @app.route("/robots.txt", methods=["GET"])

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload Civil Plans — Land Takeoffs</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <style>
+    :root { --bg:#0a0a0f; --panel:#12121a; --text:#e5e7eb; --muted:#94a3b8; --cyan:#00d4ff; --border:#273142; --green:#00ff88; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,Arial,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width:980px; margin:0 auto; padding:28px 20px 60px; }
+    .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .top a { color:var(--cyan); text-decoration:none; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:28px; }
+    h1 { margin:0 0 8px; font-size:2rem; }
+    p { color:var(--muted); line-height:1.6; }
+    .drop {
+      margin-top:20px; border:1.5px dashed #3b4a61; border-radius:12px; padding:42px 20px;
+      text-align:center; background:rgba(0,212,255,0.04);
+    }
+    .drop .title { color:var(--text); font-weight:700; margin-bottom:8px; }
+    .note { margin-top:18px; font-size:.95rem; color:#aab4c5; }
+    .premium { margin-top:16px; padding:10px 12px; border:1px solid #3f3a1f; border-radius:10px; background:rgba(245,158,11,0.08); color:#fcd34d; font-weight:600; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
+    .field { display:flex; flex-direction:column; gap:6px; }
+    .field.full { grid-column:1 / -1; }
+    label { color:#cbd5e1; font-size:.92rem; }
+    input, textarea, select { background:#0f172a; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font:inherit; }
+    textarea { min-height:90px; resize:vertical; }
+    .btns { margin-top:20px; display:flex; gap:12px; flex-wrap:wrap; }
+    .btn { padding:10px 16px; border-radius:8px; border:1px solid var(--border); text-decoration:none; color:var(--text); background:transparent; cursor:pointer; }
+    .btn.primary { background:var(--cyan); color:#07121f; border-color:transparent; font-weight:700; }
+    .success { margin-top:16px; padding:12px 14px; border:1px solid #1f4a3a; border-radius:10px; background:rgba(34,197,94,0.1); color:#86efac; display:none; }
+    @media (max-width: 760px){ .form-grid{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <img src="/static/logo-wide.svg" alt="Land Takeoffs" height="34" />
+      <a href="/">← Back to Home</a>
+    </div>
+
+    <div class="card">
+      <h1>Upload Civil Plan PDF</h1>
+      <p>Have your plans completed already? Upload a PDF set and our team will run a plan review workflow before any final estimate package is issued.</p>
+
+      <div class="premium">Premium Service (planned): Civil plan takeoff + reviewed estimate package — $199</div>
+
+      <form id="plansForm" class="form-grid" enctype="multipart/form-data">
+        <div class="field">
+          <label for="name">Full Name</label>
+          <input id="name" name="name" required />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required />
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input id="phone" name="phone" />
+        </div>
+        <div class="field">
+          <label for="company">Company</label>
+          <input id="company" name="company" />
+        </div>
+        <div class="field full">
+          <label for="project">Project Name / Location</label>
+          <input id="project" name="project" required />
+        </div>
+        <div class="field full">
+          <label for="scope">Scope Notes (optional)</label>
+          <textarea id="scope" name="scope" placeholder="Any assumptions, phasing notes, utility details, due date..."></textarea>
+        </div>
+        <div class="field full">
+          <label for="plans">Upload Civil Plan PDF</label>
+          <input id="plans" name="plans" type="file" accept=".pdf" required />
+        </div>
+        <div class="field full">
+          <label><input type="checkbox" required /> I confirm these plans are ready for preliminary estimating review.</label>
+        </div>
+        <div class="field full">
+          <button class="btn primary" type="submit">Submit for Review</button>
+        </div>
+      </form>
+
+      <div id="successMsg" class="success">
+        We’ve received your file. You’ll receive an email with the estimate and pro forma within 24 hours from one of our licensed contractors.
+      </div>
+
+      <div class="note" style="margin-top:22px;">
+        <strong>Review Workflow:</strong><br>
+        1) Plans uploaded and intake logged<br>
+        2) Automated preliminary takeoff generated<br>
+        3) Licensed contractor reviews quantities + assumptions<br>
+        4) Estimate + pro forma package delivered after QA review
+      </div>
+
+      <div class="btns">
+        <a class="btn" href="/app">Use Map Workflow</a>
+        <a class="btn" href="/unified">Go to Unified Estimator</a>
+      </div>
+
+      <div class="note">Submissions are now saved to the review queue. Email delivery to contractor intake runs when SMTP is configured.</div>
+    </div>
+  </div>
+  <script>
+    const form = document.getElementById('plansForm');
+    const successMsg = document.getElementById('successMsg');
+
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      successMsg.style.display = 'none';
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      try {
+        const formData = new FormData(form);
+        const resp = await fetch('/api/plans-upload', { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || 'Upload failed');
+        }
+
+        successMsg.textContent = data.message || "We've received your file. You'll receive an email with the estimate and pro forma within 24 hours from one of our licensed contractors.";
+        successMsg.style.display = 'block';
+        form.reset();
+        window.scrollTo({ top: successMsg.offsetTop - 80, behavior: 'smooth' });
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    });
+  </script>
+</body>
+</html>

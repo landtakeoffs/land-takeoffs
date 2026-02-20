@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plan Submissions Admin — Land Takeoffs</title>
+  <style>
+    :root { --bg:#0b1020; --panel:#12192b; --text:#e5e7eb; --muted:#94a3b8; --cyan:#22d3ee; --border:#2a3550; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,Arial,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width:1200px; margin:0 auto; padding:24px; }
+    .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .top a { color:var(--cyan); text-decoration:none; }
+    .controls { display:flex; gap:10px; margin-bottom:14px; }
+    input, select, button, textarea { background:#0f172a; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font:inherit; }
+    button { cursor:pointer; }
+    table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    th, td { padding:10px; border-bottom:1px solid #24304a; vertical-align:top; font-size:14px; }
+    th { text-align:left; color:#cbd5e1; background:#10182a; }
+    .small { color:var(--muted); font-size:12px; }
+    .actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>Plan Submission Review Queue</h1>
+      <a href="/">← Back to Home</a>
+    </div>
+
+    <div class="controls">
+      <input id="token" placeholder="Admin token (if enabled)" style="min-width:280px;" />
+      <button id="loadBtn">Load Submissions</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID / Status</th>
+          <th>Client</th>
+          <th>Project</th>
+          <th>File</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const rows = document.getElementById('rows');
+    const tokenInput = document.getElementById('token');
+
+    async function loadSubmissions(){
+      rows.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
+      const token = tokenInput.value.trim();
+      const headers = token ? { 'X-Admin-Token': token } : {};
+      const res = await fetch('/api/plans-upload/submissions', { headers });
+      const data = await res.json();
+      if(!res.ok || !data.ok){ rows.innerHTML = `<tr><td colspan="5">Error: ${data.error||'Failed'}</td></tr>`; return; }
+      if(!data.submissions.length){ rows.innerHTML = '<tr><td colspan="5">No submissions yet.</td></tr>'; return; }
+
+      rows.innerHTML = data.submissions.map(s => `
+        <tr>
+          <td>
+            <div><strong>${s.id}</strong></div>
+            <div class="small">Status: ${s.status||'received'}</div>
+            <div class="small">${s.submitted_at||''}</div>
+          </td>
+          <td>
+            <div><strong>${s.name||''}</strong></div>
+            <div class="small">${s.email||''}</div>
+            <div class="small">${s.phone||''}</div>
+            <div class="small">${s.company||''}</div>
+          </td>
+          <td>
+            <div><strong>${s.project||''}</strong></div>
+            <div class="small">${(s.scope||'').slice(0,140)}</div>
+          </td>
+          <td>
+            <div class="small">${s.file||''}</div>
+            <a href="/api/plans-upload/${s.id}/file${token?`?token=${encodeURIComponent(token)}`:''}">Download PDF</a>
+          </td>
+          <td>
+            <div class="actions">
+              <select id="status-${s.id}">
+                <option value="received" ${s.status==='received'?'selected':''}>received</option>
+                <option value="in_review" ${s.status==='in_review'?'selected':''}>in_review</option>
+                <option value="needs_info" ${s.status==='needs_info'?'selected':''}>needs_info</option>
+                <option value="delivered" ${s.status==='delivered'?'selected':''}>delivered</option>
+              </select>
+              <input id="note-${s.id}" placeholder="Optional note" style="min-width:180px;" />
+              <button onclick="updateStatus('${s.id}')">Update</button>
+            </div>
+          </td>
+        </tr>`).join('');
+    }
+
+    async function updateStatus(id){
+      const token = tokenInput.value.trim();
+      const status = document.getElementById(`status-${id}`).value;
+      const note = document.getElementById(`note-${id}`).value;
+      const headers = { 'Content-Type':'application/json' };
+      if(token) headers['X-Admin-Token'] = token;
+      const res = await fetch(`/api/plans-upload/${id}/status`, {
+        method:'POST', headers,
+        body: JSON.stringify({ status, note, notifyClient: true })
+      });
+      const data = await res.json();
+      if(!res.ok || !data.ok){ alert('Update failed: ' + (data.error||'Unknown')); return; }
+      alert('Status updated' + (data.clientNotified ? ' + client notified' : ''));
+      loadSubmissions();
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', loadSubmissions);
+    loadSubmissions();
+  </script>
+</body>
+</html>
