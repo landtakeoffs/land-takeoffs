@@ -47,12 +47,12 @@ DEFAULT_SECTIONS = {
         {"Item": "W-5", "Description": '3/4" Water Service & Meter', "Unit": "EA", "Qty": 0, "Unit Price": 1500.00}, # was 1800, typical 1200-1800
     ],
     "Paving & Concrete": [
-        {"Item": "PC-1", "Description": 'Asphalt Base Course (2")', "Unit": "SY", "Qty": 0, "Unit Price": 18.00},  # was 20, typical 16-22
-        {"Item": "PC-2", "Description": 'Asphalt Surface Course (1.5")', "Unit": "SY", "Qty": 0, "Unit Price": 22.00}, # was 26, typical 18-26
-        {"Item": "PC-3", "Description": "Curb & Gutter (24\")", "Unit": "LF", "Qty": 0, "Unit Price": 26.00},      # Pennington actual
-        {"Item": "PC-4", "Description": '4\' Concrete Sidewalk', "Unit": "SF", "Qty": 0, "Unit Price": 8.00},       # was 9.50, typical 7-10
-        {"Item": "PC-5", "Description": "ADA Ramp", "Unit": "EA", "Qty": 0, "Unit Price": 1000.00},                # was 1200, typical 800-1200
-        {"Item": "PC-6", "Description": "Driveway Apron", "Unit": "EA", "Qty": 0, "Unit Price": 3000.00},          # was 8500! Residential ~2500-3500
+        {"Item": "PC-1", "Description": 'Asphalt Base Course (2")', "Unit": "SY", "Qty": 0, "Unit Price": 14.00},  # was 20, typical 16-22
+        {"Item": "PC-2", "Description": 'Asphalt Surface Course (1.5")', "Unit": "SY", "Qty": 0, "Unit Price": 16.00}, # was 26, typical 18-26
+        {"Item": "PC-3", "Description": "Curb & Gutter (24\")", "Unit": "LF", "Qty": 0, "Unit Price": 22.00},      # Pennington actual
+        {"Item": "PC-4", "Description": '4\' Concrete Sidewalk', "Unit": "SF", "Qty": 0, "Unit Price": 6.00},       # was 9.50, typical 7-10
+        {"Item": "PC-5", "Description": "ADA Ramp", "Unit": "EA", "Qty": 0, "Unit Price": 750.00},                # was 1200, typical 800-1200
+        {"Item": "PC-6", "Description": "Driveway Apron", "Unit": "EA", "Qty": 0, "Unit Price": 1800.00},          # was 8500! Residential ~2500-3500
     ],
     "Striping & Signage": [
         {"Item": "ST-1", "Description": '4" Thermoplastic Striping', "Unit": "LF", "Qty": 0, "Unit Price": 0.90},  # was 1.10, typical 0.75-1.10
