@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Land Takeoffs — Site Analysis</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2300d4ff'/%3E%3Cstop offset='100%25' stop-color='%2300ff88'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0f'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 44 L24 28 L34 36 L52 18 L52 44 Z' fill='url(%23g)' opacity='0.15'/%3E%3Ccircle cx='52' cy='18' r='3.5' fill='%2300ff88'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- draw tools removed -->
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f; --panel: #12121a; --border: #1e1e2e;
+    --cyan: #00d4ff; --green: #00ff88; --orange: #ff8800;
+    --red: #ff4444; --text: #e0e0e0; --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'SF Pro', sans-serif; background: var(--bg); color: var(--text); }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 380px 1fr; grid-template-rows: 60px 1fr; height: 100vh; transition: grid-template-columns 0.35s ease; }
+  .app.analysis-mode { grid-template-columns: 50vw 1fr; }
+  .app.analysis-mode .sidebar { padding: 24px; }
+  .app.analysis-mode .results.visible {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .app.analysis-mode .results.visible .card {
+    margin-bottom: 0;
+    padding: 20px;
+    border-width: 1.5px;
+  }
+  .app.analysis-mode .results.visible .card h3 {
+    font-size: 1.02em;
+    margin-bottom: 14px;
+  }
+  .app.analysis-mode .results.visible .stat {
+    padding: 9px 0;
+    font-size: 0.98em;
+  }
+  .app.analysis-mode .results.visible .stat-label { font-size: 0.95em; }
+  .app.analysis-mode .results.visible .stat-value { font-size: 1.02em; }
+  .app.analysis-mode .results.visible #devTypeSelector { grid-column: 1 / -1; }
+  .app.analysis-mode .results.visible .meter { height: 32px; }
+  .app.analysis-mode .results.visible .meter-text { font-size: 0.95em; }
+  header { grid-column: 1 / -1; background: var(--panel); border-bottom: 1px solid var(--border);
+           display: flex; align-items: center; padding: 0 24px; gap: 16px; }
+  header h1 { font-size: 1.3em; color: var(--cyan); font-weight: 600; }
+  header .status { margin-left: auto; font-size: 0.85em; }
+  header .status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                        background: var(--green); margin-right: 6px; }
+
+  .sidebar { background: var(--panel); border-right: 1px solid var(--border);
+             overflow-y: auto; padding: 20px; }
+  #map { width: 100%; height: 100%; }
+
+  /* Cards */
+  .card { background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+          border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h3 { font-size: 0.9em; color: var(--cyan); margin-bottom: 12px; text-transform: uppercase;
+             letter-spacing: 0.5px; }
+
+  /* Form */
+  label { display: block; font-size: 0.8em; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
+  input[type="number"], input[type="text"], select {
+    width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 0.9em; }
+  input:focus, select:focus { outline: none; border-color: var(--cyan); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* Buttons */
+  .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 0.95em;
+         font-weight: 600; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
+  .btn-primary { background: var(--cyan); color: #000; }
+  .btn-primary:hover { background: #33ddff; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+  /* Results */
+  .results { display: none; }
+  .results.visible { display: block; }
+  .stat { display: flex; justify-content: space-between; padding: 6px 0;
+          border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85em; }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-value.good { color: var(--green); }
+  .stat-value.warn { color: var(--orange); }
+  .stat-value.bad { color: var(--red); }
+
+  /* Progress */
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--cyan); border-radius: 2px;
+                   transition: width 0.3s; width: 0%; }
+
+  /* Buildable meter */
+  .meter { height: 24px; background: var(--border); border-radius: 12px; overflow: hidden; margin: 8px 0; position: relative; }
+  .meter-fill { height: 100%; border-radius: 12px; transition: width 0.5s ease; }
+  .meter-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                font-size: 0.8em; font-weight: 700; color: #000; }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* Loading */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border);
+             border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Search bar */
+  .search-box { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000;
+                display: flex; gap: 0; width: 420px; }
+  .search-box input { flex: 1; padding: 10px 16px; background: rgba(10,10,15,0.92); border: 1px solid var(--border);
+                      border-radius: 8px 0 0 8px; color: var(--text); font-size: 0.95em; backdrop-filter: blur(8px); }
+  .search-box input:focus { outline: none; border-color: var(--cyan); }
+  .search-box input::placeholder { color: var(--muted); }
+  .search-box button { padding: 10px 16px; background: var(--cyan); color: #000; border: none;
+                       border-radius: 0 8px 8px 0; font-weight: 600; cursor: pointer; font-size: 0.9em; }
+  .search-box button:hover { background: #33ddff; }
+  .search-results { position: absolute; top: 44px; left: 0; right: 0; background: rgba(10,10,15,0.95);
+                    border: 1px solid var(--border); border-radius: 8px; max-height: 240px; overflow-y: auto;
+                    display: none; backdrop-filter: blur(8px); }
+  .search-results.visible { display: block; }
+  .search-result { padding: 10px 16px; cursor: pointer; font-size: 0.85em; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .search-result:hover { background: rgba(0,212,255,0.1); }
+  .search-result .result-name { color: var(--text); }
+  .search-result .result-detail { color: var(--muted); font-size: 0.85em; margin-top: 2px; }
+
+  /* Instructions overlay */
+  .instructions { position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+                  background: rgba(0,0,0,0.85); border: 1px solid var(--border); border-radius: 10px;
+                  padding: 16px 24px; z-index: 1000; text-align: center; pointer-events: none; }
+  .instructions h4 { color: var(--cyan); margin-bottom: 6px; }
+  .instructions p { color: var(--muted); font-size: 0.85em; }
+  .instructions.hidden { display: none; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel); border: 1px solid var(--cyan);
+           border-radius: 8px; padding: 12px 20px; z-index: 2000; display: none; font-size: 0.9em; }
+  .toast.show { display: block; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Development Type Modal */
+  .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                   background: rgba(0,0,0,0.75); z-index: 3000; display: none;
+                   align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+  .modal-overlay.visible { display: flex; }
+  .modal { background: var(--panel); border: 2px solid var(--cyan); border-radius: 16px;
+           padding: 32px; max-width: 600px; width: 90%; animation: modalIn 0.3s; }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  .modal h2 { color: var(--cyan); margin-bottom: 12px; font-size: 1.5em; }
+  .modal p { color: var(--muted); margin-bottom: 24px; font-size: 0.95em; line-height: 1.5; }
+  .modal-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .modal-btn { padding: 20px; border: 2px solid var(--border); border-radius: 12px;
+               background: rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s;
+               text-align: center; }
+  .modal-btn:hover { border-color: var(--cyan); background: rgba(0,212,255,0.08); transform: translateY(-2px); }
+  .modal-btn-icon { font-size: 2.5em; margin-bottom: 12px; }
+  .modal-btn-title { color: var(--text); font-weight: 600; font-size: 1.1em; margin-bottom: 6px; }
+  .modal-btn-desc { color: var(--muted); font-size: 0.85em; line-height: 1.4; }
+
+  @media (max-width: 1200px) {
+    .app.analysis-mode { grid-template-columns: 1fr; }
+    .app.analysis-mode .results.visible { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <img src="/static/logo.svg" alt="Land Takeoffs" width="36" height="36" style="flex-shrink:0;"/>
+      <div>
+        <h1 style="font-size:1.3em;line-height:1;">Land Takeoffs</h1>
+        <span style="color:var(--muted);font-size:0.75em;letter-spacing:0.5px;">SITE ANALYSIS & ESTIMATION</span>
+      </div>
+    </div>
+    <a href="/estimate?type=residential" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">🏘️ Residential</a>
+    <a href="/estimate?type=commercial" style="color:var(--cyan);text-decoration:none;font-size:0.9em;font-weight:600;padding:8px 16px;border:1px solid var(--cyan);border-radius:6px;">🏢 Commercial</a>
+    <div class="status"><span class="dot"></span>Online</div>
+  </header>
+
+  <div class="sidebar">
+    <!-- Parcel Layer & Search -->
+    <div class="card">
+      <h3>🗺️ Greenville County Parcels</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85em;color:var(--text);">
+          <input type="checkbox" id="parcelLayerToggle" checked onchange="toggleParcelLayer(this.checked)"
+                 style="width:auto;accent-color:var(--cyan);">
+          Show parcel boundaries
+        </label>
+        <span id="parcelLayerStatus" style="font-size:0.75em;color:var(--green);">● ON</span>
+      </div>
+      <p style="font-size:0.8em;color:var(--muted);margin-bottom:8px;">
+        Click any parcel on the map to see details, or search below.
+      </p>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="parcelQuery" placeholder="Address, owner, PIN, subdivision..."
+               onkeydown="if(event.key==='Enter')searchParcels()" style="flex:1;">
+        <select id="parcelField" style="width:90px;font-size:0.8em;">
+          <option value="auto">Auto</option>
+          <option value="address">Address</option>
+          <option value="owner">Owner</option>
+          <option value="pin">PIN</option>
+          <option value="subdivision">Subdiv</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary" onclick="searchParcels()" style="margin-top:8px;">Search Parcels</button>
+
+      <!-- Selected parcel info -->
+      <div id="selectedParcelInfo" style="display:none;margin-top:12px;padding:12px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:8px;">
+        <div style="font-weight:600;color:var(--cyan);margin-bottom:6px;" id="selParcelTitle">—</div>
+        <div style="font-size:0.82em;" id="selParcelDetails"></div>
+        <button class="btn btn-primary" id="parcelAnalyzeBtn" onclick="analyzeSelectedParcel()" style="margin-top:8px;font-size:0.85em;padding:8px;">
+          ⚡ Analyze Terrain
+        </button>
+        <div class="progress-bar" id="parcelProgressBar"><div class="progress-fill" id="parcelProgressFill"></div></div>
+      </div>
+
+      <div id="parcelResults" style="display:none;max-height:250px;overflow-y:auto;margin-top:10px;"></div>
+    </div>
+
+    <!-- Hidden coordinate storage -->
+    <input type="hidden" id="south"><input type="hidden" id="north">
+    <input type="hidden" id="west"><input type="hidden" id="east">
+    <input type="hidden" id="maxSlope" value="15">
+    <div id="shapeInfo" style="display:none;"></div>
+    <div id="analyzeBtn" style="display:none;"></div>
+    <div id="progressBar" style="display:none;"><div id="progressFill"></div></div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+      <div class="card">
+        <h3>📊 Elevation</h3>
+        <div class="stat"><span class="stat-label">Min Elevation</span><span class="stat-value" id="elevMin">—</span></div>
+        <div class="stat"><span class="stat-label">Max Elevation</span><span class="stat-value" id="elevMax">—</span></div>
+        <div class="stat"><span class="stat-label">Mean Elevation</span><span class="stat-value" id="elevMean">—</span></div>
+        <div class="stat"><span class="stat-label">Relief (Range)</span><span class="stat-value" id="elevRange">—</span></div>
+        <div class="stat"><span class="stat-label">Std Deviation</span><span class="stat-value" id="elevStd">—</span></div>
+      </div>
+
+      <div class="card">
+        <h3>⛰️ Slope Analysis</h3>
+        <div class="stat"><span class="stat-label">Min Slope</span><span class="stat-value" id="slopeMin">—</span></div>
+        <div class="stat"><span class="stat-label">Max Slope</span><span class="stat-value" id="slopeMax">—</span></div>
+        <div class="stat"><span class="stat-label">Mean Slope</span><span class="stat-value" id="slopeMean">—</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🏠 Buildability</h3>
+        <div class="meter" id="buildMeter">
+          <div class="meter-fill" id="buildFill"></div>
+          <span class="meter-text" id="buildPct">—</span>
+        </div>
+        <div class="stat"><span class="stat-label">Optimal Pad Elevation</span><span class="stat-value" id="padElev">—</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🚜 Cut / Fill Estimate</h3>
+        <div class="stat"><span class="stat-label">Cut Volume</span><span class="stat-value" id="cutVol">—</span></div>
+        <div class="stat"><span class="stat-label">Fill Volume</span><span class="stat-value" id="fillVol">—</span></div>
+        <div class="stat"><span class="stat-label">Net</span><span class="stat-value" id="netVol">—</span></div>
+      </div>
+
+      <div class="card" id="devTypeSelector" style="display:none;">
+        <h3>🚀 Choose Development Type</h3>
+        <p style="font-size:0.85em;color:var(--muted);margin-bottom:12px;line-height:1.4;">
+          Select the development path for this parcel:
+        </p>
+        <button class="btn btn-primary" onclick="selectDevType('residential')" style="margin-bottom:8px;">
+          🏘️ Residential Development
+        </button>
+        <div style="font-size:0.8em;color:var(--muted);margin-bottom:12px;text-align:center;">
+          Takeoff estimate → Lot sales proforma
+        </div>
+        <button class="btn btn-primary" onclick="selectDevType('commercial')" style="background:var(--orange);">
+          🏢 Commercial Development
+        </button>
+        <div style="font-size:0.8em;color:var(--muted);margin-top:8px;text-align:center;">
+          Skip to NNN lease proforma
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: relative;">
+    <div id="map"></div>
+    <div class="search-box" id="searchBox">
+      <input type="text" id="searchInput" placeholder="Search address, city, or project name..."
+             onkeydown="if(event.key==='Enter')searchLocation()">
+      <button onclick="searchLocation()">Search</button>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+    <div class="instructions" id="instructions">
+      <h4>Click a Parcel to Get Started</h4>
+      <p>Zoom in and click any parcel — terrain analysis runs automatically.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Development Type Selector Modal (deprecated - now in sidebar) -->
+<div class="modal-overlay" id="devTypeModal" style="display:none;">
+  <div class="modal">
+    <h2>✅ Terrain Analysis Complete</h2>
+    <p>Now choose your development type to proceed with cost estimation and financial modeling.</p>
+    
+    <div class="modal-buttons">
+      <div class="modal-btn" onclick="selectDevType('residential')">
+        <div class="modal-btn-icon">🏘️</div>
+        <div class="modal-btn-title">Residential</div>
+        <div class="modal-btn-desc">Takeoff estimate → Lot sales proforma</div>
+      </div>
+      
+      <div class="modal-btn" onclick="selectDevType('commercial')">
+        <div class="modal-btn-icon">🏢</div>
+        <div class="modal-btn-title">Commercial</div>
+        <div class="modal-btn-desc">Skip to NNN lease proforma</div>
+      </div>
+    </div>
+    
+    <button class="btn btn-secondary" onclick="closeDevTypeModal()" style="margin-top:20px;width:100%;">Cancel</button>
+  </div>
+</div>
+
+<script>
+// Map setup — centered on Greenville, SC area
+const map = L.map('map', { zoomControl: true }).setView([34.85, -82.35], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap', maxZoom: 19,
+}).addTo(map);
+
+// Satellite layer option
+const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '© Esri', maxZoom: 19,
+});
+
+// Layer control
+L.control.layers({
+  'Street': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 19 }).addTo(map),
+  'Satellite': satellite,
+}).addTo(map);
+
+// (Draw tools removed — terrain analysis auto-runs on parcel click)
+
+// Analysis
+function runAnalysis() {
+  const south = parseFloat(document.getElementById('south').value);
+  const north = parseFloat(document.getElementById('north').value);
+  const west = parseFloat(document.getElementById('west').value);
+  const east = parseFloat(document.getElementById('east').value);
+
+  if (isNaN(south) || isNaN(north) || isNaN(west) || isNaN(east)) {
+    showToast('⚠️ Enter coordinates or draw a rectangle on the map');
+    return;
+  }
+  runAnalysisWithCoords(south, north, west, east);
+}
+
+async function runAnalysisWithCoords(south, north, west, east) {
+  const maxSlope = parseFloat(document.getElementById('maxSlope').value);
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+
+  // Fake progress
+  const fill = document.getElementById('progressFill');
+  fill.style.width = '20%';
+  setTimeout(() => fill.style.width = '50%', 500);
+  setTimeout(() => fill.style.width = '70%', 2000);
+
+  try {
+    const resp = await fetch('/api/analyze-coords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ south, north, west, east, max_slope: maxSlope }),
+    });
+    const data = await resp.json();
+    fill.style.width = '100%';
+
+    if (data.error) {
+      showToast('❌ ' + data.error);
+      return;
+    }
+
+    displayResults(data);
+    showToast('✅ Analysis complete');
+  } catch (err) {
+    showToast('❌ Network error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Analyze Terrain';
+    setTimeout(() => fill.style.width = '0%', 1000);
+  }
+}
+
+function displayResults(d) {
+  const resultsEl = document.getElementById('results');
+  resultsEl.classList.add('visible');
+  const appLayout = document.querySelector('.app');
+  if (appLayout) appLayout.classList.add('analysis-mode');
+  // Auto-scroll sidebar to results
+  setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+  // Elevation
+  const e = d.elevation_stats;
+  document.getElementById('elevMin').textContent = e.min.toFixed(1) + ' m';
+  document.getElementById('elevMax').textContent = e.max.toFixed(1) + ' m';
+  document.getElementById('elevMean').textContent = e.mean.toFixed(1) + ' m';
+  document.getElementById('elevRange').textContent = e.range.toFixed(1) + ' m';
+  document.getElementById('elevStd').textContent = e.std.toFixed(2) + ' m';
+
+  // Slope
+  const s = d.slope_stats;
+  document.getElementById('slopeMin').textContent = s.min.toFixed(1) + '°';
+  document.getElementById('slopeMax').textContent = s.max.toFixed(1) + '°';
+  const slopeMeanEl = document.getElementById('slopeMean');
+  slopeMeanEl.textContent = s.mean.toFixed(1) + '°';
+  slopeMeanEl.className = 'stat-value ' + (s.mean < 8 ? 'good' : s.mean < 15 ? 'warn' : 'bad');
+
+  // Buildability
+  const pct = d.buildable_pct;
+  const buildFill = document.getElementById('buildFill');
+  buildFill.style.width = pct + '%';
+  buildFill.style.background = pct > 70 ? 'var(--green)' : pct > 40 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('buildPct').textContent = pct.toFixed(1) + '% Buildable';
+  document.getElementById('padElev').textContent = d.optimal_pad_elevation.toFixed(1) + ' m';
+
+  // Cut/Fill
+  const cf = d.cut_fill;
+  document.getElementById('cutVol').textContent = formatCY(cf.cut_cy);
+  document.getElementById('fillVol').textContent = formatCY(cf.fill_cy);
+  const net = cf.cut_cy - cf.fill_cy;
+  const netEl = document.getElementById('netVol');
+  netEl.textContent = (net > 0 ? '+' : '') + formatCY(net) + (net > 0 ? ' (export)' : ' (import)');
+  netEl.className = 'stat-value ' + (Math.abs(net) < 1000 ? 'good' : 'warn');
+}
+
+function formatCY(val) {
+  if (Math.abs(val) >= 1000000) return (val / 1000000).toFixed(1) + 'M CY';
+  if (Math.abs(val) >= 1000) return (val / 1000).toFixed(1) + 'K CY';
+  return val.toFixed(0) + ' CY';
+}
+
+async function generateEstimate() {
+  showToast('📋 Generating estimate workbook...');
+  try {
+    const resp = await fetch('/api/estimate', { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    showToast('✅ Estimate saved: ' + data.file);
+  } catch (err) {
+    showToast('❌ ' + err.message);
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// ---- Address Search (Nominatim / OpenStreetMap) ----
+let searchMarker = null;
+
+async function searchLocation() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) return;
+
+  const resultsDiv = document.getElementById('searchResults');
+  resultsDiv.innerHTML = '<div class="search-result"><span class="result-name">Searching...</span></div>';
+  resultsDiv.classList.add('visible');
+
+  try {
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1&countrycodes=us`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const data = await resp.json();
+
+    if (data.length === 0) {
+      resultsDiv.innerHTML = '<div class="search-result"><span class="result-name" style="color:var(--muted)">No results found</span></div>';
+      return;
+    }
+
+    resultsDiv.innerHTML = data.map((r, i) => {
+      const bbox = r.boundingbox; // [south, north, west, east]
+      return `<div class="search-result" onclick="selectSearchResult(${r.lat}, ${r.lon}, [${bbox}], '${r.display_name.replace(/'/g, "\\'")}')">
+        <div class="result-name">${r.display_name.split(',').slice(0, 2).join(',')}</div>
+        <div class="result-detail">${r.display_name.split(',').slice(2).join(',').trim()}</div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    resultsDiv.innerHTML = '<div class="search-result"><span class="result-name" style="color:var(--red)">Search error</span></div>';
+  }
+}
+
+function selectSearchResult(lat, lon, bbox, name) {
+  // Close results
+  document.getElementById('searchResults').classList.remove('visible');
+  document.getElementById('searchInput').value = name;
+
+  // Remove old marker
+  if (searchMarker) map.removeLayer(searchMarker);
+
+  // Add pin
+  searchMarker = L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: '',
+      html: '<div style="background:var(--cyan);width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(0,212,255,0.5);"></div>',
+      iconSize: [12, 12], iconAnchor: [6, 6],
+    })
+  }).addTo(map).bindPopup(`<b>${name.split(',')[0]}</b>`).openPopup();
+
+  // Zoom to result
+  if (bbox && bbox.length === 4) {
+    const [south, north, west, east] = bbox.map(Number);
+    map.fitBounds([[south, west], [north, east]], { padding: [50, 50], maxZoom: 16 });
+  } else {
+    map.setView([lat, lon], 15);
+  }
+
+  document.getElementById('instructions').classList.add('hidden');
+}
+
+// Close search results when clicking elsewhere
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('searchBox').contains(e.target)) {
+    document.getElementById('searchResults').classList.remove('visible');
+  }
+});
+
+// Pass parcel data to estimate page
+function buildEstimateLink(e) {
+  if (!selectedParcelData) return; // just use /estimate with no params
+  e.preventDefault();
+  const p = selectedParcelData;
+  const params = new URLSearchParams();
+  if (p.GIS_ACRES) params.set('acres', p.GIS_ACRES);
+  if (p.LOCATE) params.set('location', [p.STRNUM, p.LOCATE, p.CITY, p.STATE].filter(Boolean).join(', '));
+  if (p.OWNAM1) params.set('owner', p.OWNAM1);
+  if (p.PIN) params.set('pin', p.PIN);
+  if (p.SUBDIV) params.set('subdiv', p.SUBDIV);
+  window.open(`/estimate?${params}`, '_blank');
+}
+
+// Live search as you type (debounced)
+let searchTimeout;
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  const val = this.value.trim();
+  if (val.length < 3) {
+    document.getElementById('searchResults').classList.remove('visible');
+    return;
+  }
+  searchTimeout = setTimeout(searchLocation, 400);
+});
+
+// ---- Greenville County Parcel Layer (ArcGIS Dynamic) ----
+let parcelLayer = L.layerGroup().addTo(map);
+let selectedParcel = null;
+let selectedParcelData = null;
+// (single parcel selection only)
+
+// Dynamic parcel boundary overlay from GCGIS MapServer
+const parcelTileLayer = L.esri.dynamicMapLayer({
+  url: 'https://www.gcgis.org/arcgis/rest/services/GreenvilleJS/Map_Layers_JS/MapServer',
+  layers: [5],  // "All Property Types" parcel outlines
+  opacity: 0.6,
+  maxZoom: 19,
+  minZoom: 14, // only show when zoomed in enough
+}).addTo(map);
+
+function toggleParcelLayer(on) {
+  if (on) {
+    parcelTileLayer.addTo(map);
+    document.getElementById('parcelLayerStatus').innerHTML = '<span style="color:var(--green);">● ON</span>';
+  } else {
+    map.removeLayer(parcelTileLayer);
+    document.getElementById('parcelLayerStatus').innerHTML = '<span style="color:var(--muted);">○ OFF</span>';
+  }
+}
+
+// Click on map → identify parcel at that point
+map.on('click', async function(e) {
+  // Only identify when zoomed in enough to see parcels
+  if (map.getZoom() < 14) return;
+
+  const size = map.getSize();
+  const bounds = map.getBounds();
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+
+  const params = new URLSearchParams({
+    lat: e.latlng.lat,
+    lon: e.latlng.lng,
+    sw_lat: sw.lat, sw_lon: sw.lng,
+    ne_lat: ne.lat, ne_lon: ne.lng,
+    width: size.x, height: size.y,
+  });
+
+  try {
+    const resp = await fetch(`/api/parcels/identify?${params}`);
+    const data = await resp.json();
+    if (!data.features || data.features.length === 0) return;
+
+    const attr = data.features[0];
+    const geom = attr._geometry || {};
+    if (!geom.coordinates) return;
+
+    // Clear previous selection
+    parcelLayer.clearLayers();
+
+    // Highlight the parcel
+    const coords = geom.coordinates[0].map(c => [c[1], c[0]]);
+    const poly = L.polygon(coords, {
+      color: '#ff8800', weight: 3, fillOpacity: 0.25, fillColor: '#ff8800',
+    }).addTo(parcelLayer);
+
+    // Store for analysis
+    selectedParcelData = attr;
+    selectedParcelData._bounds = poly.getBounds();
+
+    // Fill coordinate inputs
+    const b = poly.getBounds();
+    document.getElementById('south').value = b.getSouth().toFixed(5);
+    document.getElementById('north').value = b.getNorth().toFixed(5);
+    document.getElementById('west').value = b.getWest().toFixed(5);
+    document.getElementById('east').value = b.getEast().toFixed(5);
+
+    // Show info in sidebar
+    showSelectedParcel(attr);
+
+    // Popup
+    poly.bindPopup(parcelPopup(attr)).openPopup();
+
+    // Auto-run terrain analysis first, then show modal
+    analyzeSelectedParcel();
+  } catch (err) {
+    console.error('Identify error:', err);
+  }
+});
+
+function showSelectedParcel(p) {
+  const panel = document.getElementById('selectedParcelInfo');
+  panel.style.display = 'block';
+
+  const addr = [p.STRNUM, p.LOCATE].filter(Boolean).join(' ');
+  document.getElementById('selParcelTitle').textContent = addr || p.DESCR || 'Selected Parcel';
+
+  const details = [];
+  if (p.OWNAM1) details.push(`<b>Owner:</b> ${p.OWNAM1}`);
+  if (p.PIN) details.push(`<b>PIN:</b> ${p.PIN}`);
+  if (p.GIS_ACRES) details.push(`<b>Acres:</b> ${parseFloat(p.GIS_ACRES).toFixed(2)}`);
+  if (p.SUBDIV) details.push(`<b>Subdivision:</b> ${p.SUBDIV}`);
+  if (p.TAXMKTVAL) details.push(`<b>Tax Value:</b> $${parseInt(p.TAXMKTVAL).toLocaleString()}`);
+  if (p.LANDVAL) details.push(`<b>Land:</b> $${parseInt(p.LANDVAL).toLocaleString()}`);
+  if (p.BLDGVAL) details.push(`<b>Building:</b> $${parseInt(p.BLDGVAL).toLocaleString()}`);
+  if (p.SLPRICE) details.push(`<b>Last Sale:</b> $${parseInt(p.SLPRICE).toLocaleString()}`);
+  if (p.LANDUSE) details.push(`<b>Land Use:</b> ${p.LANDUSE}`);
+  if (p.CITY) details.push(`<b>City:</b> ${p.CITY}, ${p.STATE || 'SC'} ${p.ZIP5 || ''}`);
+
+  document.getElementById('selParcelDetails').innerHTML = details.join('<br>');
+}
+
+function analyzeSelectedParcel() {
+  if (!selectedParcelData || !selectedParcelData._bounds) {
+    showToast('⚠️ Click a parcel on the map first');
+    return;
+  }
+  const btn = document.getElementById('parcelAnalyzeBtn');
+  const fill = document.getElementById('parcelProgressFill');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+  fill.style.width = '20%';
+  setTimeout(() => fill.style.width = '50%', 500);
+  setTimeout(() => fill.style.width = '70%', 2000);
+
+  const b = selectedParcelData._bounds;
+  runAnalysisWithCoords(b.getSouth(), b.getNorth(), b.getWest(), b.getEast()).then(() => {
+    btn.disabled = false;
+    btn.innerHTML = '✅ Analysis Complete';
+    fill.style.width = '100%';
+    setTimeout(() => fill.style.width = '0%', 1000);
+    
+    // Show dev type selector in sidebar
+    setTimeout(() => {
+      document.getElementById('devTypeSelector').style.display = 'block';
+      // Scroll to it
+      document.getElementById('devTypeSelector').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 600);
+  }).catch(err => {
+    console.error('Analysis failed:', err);
+    btn.disabled = false;
+    btn.innerHTML = '⚠️ Analysis Failed';
+    fill.style.width = '0%';
+    showToast('⚠️ Analysis failed, but you can still proceed');
+    // Show selector anyway
+    setTimeout(() => {
+      document.getElementById('devTypeSelector').style.display = 'block';
+    }, 500);
+  });
+}
+
+// ---- Parcel Search ----
+async function searchParcels() {
+  const q = document.getElementById('parcelQuery').value.trim();
+  if (!q) return;
+  const field = document.getElementById('parcelField').value;
+  const resultsDiv = document.getElementById('parcelResults');
+  resultsDiv.style.display = 'block';
+  resultsDiv.innerHTML = '<div style="color:var(--muted);font-size:0.85em;padding:8px;">Searching...</div>';
+
+  try {
+    const resp = await fetch(`/api/parcels/search?q=${encodeURIComponent(q)}&field=${field}&limit=20`);
+    const data = await resp.json();
+
+    if (data.error) { resultsDiv.innerHTML = `<div style="color:var(--red);padding:8px;font-size:0.85em;">❌ ${data.error}</div>`; return; }
+    if (data.count === 0) { resultsDiv.innerHTML = '<div style="color:var(--muted);padding:8px;font-size:0.85em;">No parcels found</div>'; return; }
+
+    // Clear old parcels
+    parcelLayer.clearLayers();
+
+    // Add to map and build list
+    const bounds = L.latLngBounds();
+    resultsDiv.innerHTML = data.features.map((p, i) => {
+      // Draw polygon on map
+      if (p._geometry && p._geometry.coordinates) {
+        const coords = p._geometry.coordinates[0].map(c => [c[1], c[0]]);
+        const poly = L.polygon(coords, {
+          color: '#00d4ff', weight: 2, fillOpacity: 0.2, fillColor: '#00d4ff',
+        }).addTo(parcelLayer);
+        poly.bindPopup(parcelPopup(p));
+        bounds.extend(poly.getBounds());
+        poly._parcelIndex = i;
+        poly.on('click', () => selectParcelOnMap(p, poly));
+      }
+
+      const addr = [p.STRNUM, p.LOCATE].filter(Boolean).join(' ');
+      const owner = p.OWNAM1 || '';
+      const acres = p.GIS_ACRES ? p.GIS_ACRES.toFixed(2) + ' ac' : '';
+      const val = p.TAXMKTVAL ? '$' + p.TAXMKTVAL.toLocaleString() : '';
+
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:0.85em;"
+                   onclick="focusParcel(${i})" id="parcel-row-${i}">
+        <div style="color:var(--text);font-weight:600;">${addr || p.DESCR || 'Parcel'}</div>
+        <div style="color:var(--muted);font-size:0.85em;">${owner} ${p.SUBDIV ? '• ' + p.SUBDIV : ''}</div>
+        <div style="color:var(--muted);font-size:0.85em;">PIN: ${p.PIN} • ${acres} ${val ? '• ' + val : ''}</div>
+      </div>`;
+    }).join('');
+
+    // Zoom to parcels
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
+    showToast(`✅ Found ${data.count} parcels`);
+
+    // Store features for focus
+    window._parcelFeatures = data.features;
+
+  } catch (err) {
+    resultsDiv.innerHTML = `<div style="color:var(--red);padding:8px;font-size:0.85em;">❌ ${err.message}</div>`;
+  }
+}
+
+function parcelPopup(p) {
+  const addr = [p.STRNUM, p.LOCATE].filter(Boolean).join(' ');
+  return `<div style="font-size:13px;min-width:200px;">
+    <b>${addr || 'Parcel'}</b><br>
+    <b>Owner:</b> ${p.OWNAM1 || '—'}${p.OWNAM2 ? '<br>' + p.OWNAM2 : ''}<br>
+    <b>PIN:</b> ${p.PIN}<br>
+    <b>Acres:</b> ${p.GIS_ACRES ? p.GIS_ACRES.toFixed(2) : p.TACRES || '—'}<br>
+    ${p.SUBDIV ? '<b>Subdiv:</b> ' + p.SUBDIV + '<br>' : ''}
+    <b>Land Use:</b> ${p.LANDUSE || '—'}<br>
+    <b>Tax Value:</b> ${p.TAXMKTVAL ? '$' + p.TAXMKTVAL.toLocaleString() : '—'}<br>
+    <b>Land:</b> ${p.LANDVAL ? '$' + p.LANDVAL.toLocaleString() : '—'} |
+    <b>Bldg:</b> ${p.BLDGVAL ? '$' + p.BLDGVAL.toLocaleString() : '—'}<br>
+    ${p.SLPRICE ? '<b>Last Sale:</b> $' + p.SLPRICE.toLocaleString() + '<br>' : ''}
+    <button onclick="analyzeParcel('${p.PIN}')" style="margin-top:6px;padding:4px 10px;background:#00d4ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-size:12px;">
+      ⚡ Analyze Terrain
+    </button>
+  </div>`;
+}
+
+function focusParcel(index) {
+  let i = 0;
+  parcelLayer.eachLayer(layer => {
+    if (layer._parcelIndex === index) {
+      map.fitBounds(layer.getBounds(), { padding: [80, 80], maxZoom: 17 });
+      layer.openPopup();
+      layer.setStyle({ color: '#ff8800', fillColor: '#ff8800', fillOpacity: 0.3 });
+      selectedParcel = layer;
+    } else if (layer._parcelIndex !== undefined) {
+      layer.setStyle({ color: '#00d4ff', fillColor: '#00d4ff', fillOpacity: 0.2 });
+    }
+  });
+}
+
+function selectParcelOnMap(p, poly) {
+  // Highlight
+  parcelLayer.eachLayer(l => {
+    if (l._parcelIndex !== undefined) l.setStyle({ color: '#00d4ff', fillColor: '#00d4ff', fillOpacity: 0.2 });
+  });
+  poly.setStyle({ color: '#ff8800', fillColor: '#ff8800', fillOpacity: 0.3 });
+  selectedParcel = poly;
+
+  // Fill coordinates from parcel bounds
+  const b = poly.getBounds();
+  document.getElementById('south').value = b.getSouth().toFixed(5);
+  document.getElementById('north').value = b.getNorth().toFixed(5);
+  document.getElementById('west').value = b.getWest().toFixed(5);
+  document.getElementById('east').value = b.getEast().toFixed(5);
+  
+  // Update concept plan link with parcel geometry
+  const conceptLink = document.querySelector('a[href="/concept-plan"]');
+  if (conceptLink) {
+    const acreage = p.GIS_ACRES || 5.0;
+    const subdivName = p.SUBDIV || 'Selected Parcel';
+    
+    if (p._geometry) {
+      // Use existing geometry
+      const geomParam = encodeURIComponent(JSON.stringify(p._geometry));
+      const newUrl = `/concept-plan?acreage=${acreage}&subdivision=${encodeURIComponent(subdivName)}&geometry=${geomParam}`;
+      conceptLink.href = newUrl;
+      console.log('Updated concept plan link with real parcel geometry:', p._geometry);
+    } else {
+      // Fallback - fetch geometry by PIN
+      console.log('No geometry in parcel data, fetching by PIN:', p.PIN);
+      fetch(`/api/parcels/${encodeURIComponent(p.PIN)}`)
+        .then(resp => resp.json())
+        .then(data => {
+          if (data._geometry) {
+            const geomParam = encodeURIComponent(JSON.stringify(data._geometry));
+            const newUrl = `/concept-plan?acreage=${acreage}&subdivision=${encodeURIComponent(subdivName)}&geometry=${geomParam}`;
+            conceptLink.href = newUrl;
+            console.log('Updated concept plan link with fetched geometry:', data._geometry);
+          } else {
+            console.log('No geometry found for PIN:', p.PIN);
+          }
+        })
+        .catch(err => console.log('Error fetching geometry:', err));
+    }
+  }
+}
+
+function analyzeParcel(pin) {
+  // Find the parcel layer and set coords, then run analysis
+  parcelLayer.eachLayer(layer => {
+    if (layer._parcelIndex !== undefined) {
+      const p = window._parcelFeatures?.[layer._parcelIndex];
+      if (p && p.PIN === pin) {
+        const b = layer.getBounds();
+        document.getElementById('south').value = b.getSouth().toFixed(5);
+        document.getElementById('north').value = b.getNorth().toFixed(5);
+        document.getElementById('west').value = b.getWest().toFixed(5);
+        document.getElementById('east').value = b.getEast().toFixed(5);
+        runAnalysis();
+      }
+    }
+  });
+}
+
+// ---- Development Type Modal ----
+function showDevTypeModal() {
+  if (!selectedParcelData) {
+    showToast('⚠️ Please select a parcel first');
+    return;
+  }
+  document.getElementById('devTypeModal').classList.add('visible');
+}
+
+function closeDevTypeModal() {
+  document.getElementById('devTypeModal').classList.remove('visible');
+}
+
+function selectDevType(type) {
+  if (!selectedParcelData) {
+    showToast('⚠️ No parcel selected');
+    return;
+  }
+  
+  // Hide the selector buttons
+  document.getElementById('devTypeSelector').style.display = 'none';
+  
+  // Store parcel data for next page
+  const parcelInfo = {
+    pin: selectedParcelData.PIN || 'Unknown',
+    owner: selectedParcelData.OWNER || selectedParcelData.OWNERNAME || selectedParcelData.OWNAM1 || 'Unknown',
+    address: selectedParcelData.ADDRESS || selectedParcelData.SITEADDR || [selectedParcelData.STRNUM, selectedParcelData.LOCATE].filter(Boolean).join(' ') || '',
+    acres: selectedParcelData.GIS_ACRES || selectedParcelData.ACRES || selectedParcelData.CALCACRES || 0,
+    bounds: selectedParcelData._bounds ? {
+      south: selectedParcelData._bounds.getSouth(),
+      north: selectedParcelData._bounds.getNorth(),
+      west: selectedParcelData._bounds.getWest(),
+      east: selectedParcelData._bounds.getEast()
+    } : null
+  };
+  
+  sessionStorage.setItem('selectedParcel', JSON.stringify(parcelInfo));
+  sessionStorage.setItem('devType', type);
+  
+  // Store terrain analysis results (already completed)
+  const results = {
+    buildable_pct: document.getElementById('buildablePct')?.textContent || '0%',
+    cut_volume: document.getElementById('cutVol')?.textContent || '0',
+    fill_volume: document.getElementById('fillVol')?.textContent || '0',
+    slope_avg: document.getElementById('slopeAvg')?.textContent || '0%',
+    elevation_range: document.getElementById('elevRange')?.textContent || '0'
+  };
+  sessionStorage.setItem('terrainResults', JSON.stringify(results));
+  
+  // Route based on type
+  if (type === 'residential') {
+    window.location.href = '/unified?type=residential';
+  } else if (type === 'commercial') {
+    // Go straight to commercial proforma
+    window.location.href = 'https://web-production-da5e4.up.railway.app';
+  }
+}
+</script>
+</body>
+</html>
